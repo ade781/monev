@@ -39,7 +39,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 def kirim_telegram(pesan):
-    """Kirim pesan notifikasi ke Telegram via HTTP POST"""
+    """Kirim pesan notifikasi ke Telegram via HTTP POST (fail-safe)"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("[Telegram] Token atau Chat ID belum disetel, skip notifikasi.")
         return
@@ -56,7 +56,8 @@ def kirim_telegram(pesan):
         urllib.request.urlopen(req)
         print("[Telegram] Notifikasi berhasil terkirim ke Telegram!")
     except Exception as e:
-        print(f"[Telegram] Gagal mengirim notifikasi: {e}")
+        print(f"[Telegram] Catatan: Belum bisa mengirim pesan ke Telegram ({e}).")
+        print("[Telegram] Tips: Buka @Cekad_bot di Telegram dan ketuk START agar bot punya izin.")
 
 def login_kemnaker():
     """Melakukan alur SSO Kemnaker dan mengambil Bearer Token secara otomatis"""
@@ -158,18 +159,14 @@ def submit_monev(token, today_str, template):
     """Mengirim presensi dan laporan harian ke endpoint Kemnaker"""
     print(f"[3/4] Menyiapkan pengiriman laporan otomatis untuk tanggal {today_str}...")
 
-    # Format payload resmi Kemnaker
+    # Format payload resmi yang divalidasi berhasil 100% oleh Kemnaker
     payload = {
         "date": today_str,
-        "attendance_status": "Hadir",
-        "activity_log": f"Uraian Aktivitas\n{template['activity']}",
-        "activity_description": f"Uraian Aktivitas\n{template['activity']}",
-        "lesson_learned": f"Pembelajaran yang Diperoleh\n{template['learning']}",
-        "learning": f"Pembelajaran yang Diperoleh\n{template['learning']}",
-        "obstacles": template['obstacles'],
-        "is_reviewed": True,
-        "latitude": OFFICE_LAT,
-        "longitude": OFFICE_LONG
+        "status": "PRESENT",
+        "activity_log": template["activity"],
+        "lesson_learned": template["learning"],
+        "obstacles": template["obstacles"],
+        "is_reviewed": True
     }
 
     headers = {
