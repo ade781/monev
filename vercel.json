@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron?type=reminder",
-      "schedule": "30 10 * * 1-5"
+      "schedule": "0 12,13 * * *"
     },
     {
       "path": "/api/cron",

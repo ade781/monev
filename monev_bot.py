@@ -372,8 +372,31 @@ def submit_monev(token, today_str, template, custom_activity=None):
         print(f"[ERROR Kemnaker API] HTTP {e.code}: {error_body}", flush=True)
         raise Exception(f"Server Kemnaker menolak pengiriman: {error_body}") from e
 
-def kirim_pengingat_sore(chat_id=None):
-    """Fitur 6: Pengingat sore ramah jam 17:30 WIB khusus menyapa 'Mas Ade'"""
+TEMPLATES_PENGINGAT_LUCU = [
+    "🚨 *Panggilan darurat untuk Mas Ade!* Server Kemnaker sudah kangen ketikan jemari manismu. Ayo gek ngisi monev sakdurunge jam 9 bengi! 🏃‍♂️💨",
+    "☕ Mas Ade, kopi udah habis, kerjaan kantor udah beres, tinggal monev yang masih mangap-mangap minta diisi tuh. Gek ndang diisi mas! 📝",
+    "😇 *Info penting maszeh:* Bidadari surga konon lebih suka pemuda magang yang disiplin ngisi monev tepat waktu. Gek sat-set diisi Mas Ade! ✨",
+    "💔 Monev itu ibarat masa depan Mas Ade, kalau nggak segera dipastiin nanti nyesel lho... Gek ndang diisi mas, ojo ditunda-tunda! 😂",
+    "🥺 Mas Ade yang ganteng tiada tandingan, tolonglah isi monev sekarang juga. Jangan biarkan sistem ini menangis meraung-raung jam 9 nanti! 🙏",
+    "🚐 *Ting tang ting tung!* Ini bukan tahu bulat digoreng dadakan, tapi alarm monev buat Mas Ade. Ayo gek diisi, lima menit kelar kok! 🔥",
+    "🌙 Mas Ade, daripada overthinking mikirin masa depan pas malam begini, mending mikirin kegiatan hari ini terus masukin ke monev. Gek ndang, selak wengi! 🧘‍♂️",
+    "🪓 Status hubungan boleh digantung, tapi status presensi monev jangan dong Mas Ade! Gek ngisi sakiki, ojo mager-mager! 👀",
+    "🏆 Ada pepatah kuno mengatakan: _'Orang sukses adalah orang yang monev-nya selalu terisi sebelum jam 9 malam.'_ Buktikan suksesmu Mas Ade! 🕶️",
+    "🛌 Punten Mas Ade... cuma mau ngingetin sebelum laptop ditutup dan kasur memanggil mesra: monev-mu wis mbok isi urung? Gek diisi lho! 💤",
+    "🧙‍♂️ Mas Ade, jangan sampai mentor magangmu bertanya: _'Mas Ade hari ini bertapa atau magang ya kok nggak ada monev-nya?'_ Ayo gek gas diisi! ⚡",
+    "📉 *Pemberitahuan resmi:* Mas Ade terdeteksi belum ngisi monev. Tingkat ketampanan menurun 15% sampai monev hari ini terisi. Gek sat-set! 😎",
+    "🍢 Beli sate ke pasar baru, pulangnya beli sepatu. Halo Mas Ade yang lucu, ayo gek monev-an dulu! 👟✨",
+    "📋 Mas Ade, kamu boleh lupa kenangan masa lalu, tapi jangan pernah lupa sama monev Kemnaker. Gek diisi Mas Ade, mantan nggak bakal ngasih nilai magang! 💔",
+    "⏳ Detik-detik menuju malam mencekam jam 9... Mas Ade segera amankan presensi hari ini sebelum bot cadangan terpaksa turun tangan! 🚀",
+    "📱 Mas Ade, nyalakan alarm kewaspadaan! Jempolmu diciptakan bukan cuma buat scrolling medsos, tapi juga buat MENGISI MONEV! Gek diisi mas! 👍",
+    "🥷 *Lapor Mas Ade!* Misi rahasia hari ini tinggal satu: mengalahkan rasa mager dan mengisi monev sebelum jam 21.00. Laksanakan segera! 🎯",
+    "💖 Mas Ade, tahu nggak bedanya kamu sama monev? Kalau kamu selalu di hati, kalau monev selalu bikin kepikiran sampai diisi sekarang! Gek ndang! 🤖",
+    "📢 *Woro-woro kanggo Mas Ade!* Monggo dipun isi monev-ipun sakmenika mawon, ampun kesupen nggih mas. Sat-set bat-bet rampung! 🇮🇩",
+    "💾 Mas Ade, hidup ini cuma sementara, tapi rekap absen monev abadi di database Kemnaker sampai lulus magang. Ayo gek diisi mas! 🎓"
+]
+
+def kirim_pengingat_monev(chat_id=None):
+    """Pengingat lucu acak jam 19:00 & 20:00 WIB untuk Mas Ade"""
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
 
@@ -382,24 +405,27 @@ def kirim_pengingat_sore(chat_id=None):
         token = login_kemnaker()
         sudah_absen, _ = periksa_absen_hari_ini(token, today_str)
     except Exception as e:
-        print(f"[Pengingat Sore] Gagal cek status: {e}", flush=True)
+        print(f"[Pengingat Monev] Gagal cek status: {e}", flush=True)
 
     if sudah_absen:
         pesan = (
             "👋 *Halo Mas Ade!*\n\n"
-            "Presensi monev hari ini terpantau sudah terisi dengan aman (✅ *PRESENT*).\n\n"
-            "Terima kasih atas kedisiplinannya, selamat beristirahat dan hati-hati di perjalanan pulang! 🚀"
+            "Presensi monev hari ini terpantau sudah terisi aman (✅ *PRESENT*).\n\n"
+            "Mantap maszeh! Lanjutkan santai atau rebahannya, malam ini aman terkendali! 🛋️✨"
         )
     else:
+        kalimat_lucu = random.choice(TEMPLATES_PENGINGAT_LUCU)
         pesan = (
-            "👋 *Hai Mas Ade! Waktunya pulang kantor nih.* 🏢\n\n"
-            "⚠️ Jangan lupa untuk mengisi presensi & log kegiatan harian secara mandiri ya sebelum pukul 21:00 WIB.\n\n"
-            "💡 _Kalau nanti malam Mas Ade belum sempat mengisi atau ada keperluan lain, tenang saja! "
-            "Bot Monev ADE7 Reminder akan otomatis mem-backup pengisiannya tepat pukul 21:00 WIB._ 😉"
+            f"{kalimat_lucu}\n\n"
+            "⏰ *Batas Waktu Mandiri:* Sebelum 21:00 WIB\n"
+            "💡 _Ketik `/isi <kegiatan>` untuk mengisi langsung lewat bot, atau klik tombol di bawah._"
         )
 
     kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
-    return {"status": "success", "message": "Pengingat sore terkirim ke Mas Ade"}
+    return {"status": "success", "message": "Pengingat lucu terkirim ke Mas Ade"}
+
+# Alias untuk kompatibilitas
+kirim_pengingat_sore = kirim_pengingat_monev
 
 def ambil_rekap_mingguan():
     """Fitur 8: Mengambil ringkasan riwayat presensi 7 hari terakhir untuk Mas Ade"""
