@@ -61,15 +61,9 @@ def handle_telegram_command(chat_id, text):
     elif cmd in ["/monev", "/run", "/submit"]:
         try:
             res = monev_bot.main()
-            status = res.get("status")
-            if status == "already_submitted":
-                return f"✅ *Monev Aman!*\nPresensi untuk tanggal `{res.get('date')}` sudah terisi sebelumnya."
-            elif status == "submitted":
-                return f"🚀 *Berhasil!*\nLaporan Monev tanggal `{res.get('date')}` berhasil disubmit ke server Kemnaker!"
-            else:
-                return f"ℹ️ *Hasil Monev:* `{res}`"
+            return res.get("message", "Selesai dieksekusi")
         except Exception as e:
-            return f"❌ *Gagal Menjalankan Monev:*\n`{str(e)}`"
+            return f"❌ *Gagal:* `{str(e)}`"
 
     elif cmd in ["/proxy"]:
         cf_proxy = os.getenv("CLOUDFLARE_WORKER_URL")

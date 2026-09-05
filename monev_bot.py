@@ -340,40 +340,20 @@ def main():
     print(f"Waktu Sekarang: {today_str} {jam_str} WIB")
 
     try:
-        # 1. Login Otomatis
-        token = login_kemnaker()
+        # Kirim request ke server Kemnaker dan ambil teks 'message' aslinya
+        pesan_server = test_post_kemnaker()
+        print(f"[Respon Server Kemnaker]: {pesan_server}")
 
-        # 2. Cek apakah sudah absen hari ini
-        sudah_absen, data_absen = periksa_absen_hari_ini(token, today_str)
-        if sudah_absen:
-            print(f"[AMAN] Anda sudah mengisi presensi tanggal {today_str} secara manual (Status: {data_absen.get('status')}).")
-            print("Bot tidak perlu melakukan aksi apa pun. Program selesai.")
-            return {"status": "already_submitted", "date": today_str, "details": data_absen}
-
-        # 3. Jika belum absen, kirim otomatis
-        print(f"[PERINGATAN] Anda belum mengisi presensi untuk tanggal {today_str}!")
-        template = ambil_template(today_wib)
-        
-        hasil = submit_monev(token, today_str, template)
-        print(f"[BERHASIL] Laporan berhasil disubmit ke server Kemnaker: {hasil}")
-
-        # 4. Kirim notifikasi Telegram
-        pesan_notif = (
-            f"✅ *Monev ADE7 Reminder - Terisi Otomatis!*\n\n"
-            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
-            f"📍 *Lokasi:* `{OFFICE_LAT}, {OFFICE_LONG}`\n\n"
-            f"📝 *Aktivitas:*\n_{template['activity']}_\n\n"
-            f"💡 *Pembelajaran:*\n_{template['learning']}_\n\n"
-            f"Laporan cadangan berhasil disubmit karena Anda belum mengisi sebelum jadwal bot."
-        )
-        kirim_telegram(pesan_notif)
-        return {"status": "submitted", "date": today_str, "result": hasil}
+        # Kirimkan hanya pesan dari server ke Telegram
+        kirim_telegram(pesan_server)
+        return {"status": "success", "date": today_str, "message": pesan_server}
 
     except Exception as e:
-        pesan_error = f"⚠️ *Monev ADE7 Reminder - Gagal Auto Absen!*\nTerjadi kendala pada {today_str} {jam_str} WIB:\n`{str(e)}`"
-        print(f"[ERROR] {e}")
+        pesan_error = f"Gagal: {e}"
+        print(f"[ERROR] {pesan_error}")
         kirim_telegram(pesan_error)
         raise e
 
 if __name__ == "__main__":
     main()
+
