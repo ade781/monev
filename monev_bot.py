@@ -88,6 +88,17 @@ def get_opener():
     opener = urllib.request.build_opener(*handlers)
     return opener, cj
 
+def wrap_url(target_url):
+    """Mengarahkan URL melalui Cloudflare Worker Reverse Proxy jika disetel"""
+    cf_worker = os.getenv("CLOUDFLARE_WORKER_URL")
+    if cf_worker and len(cf_worker.strip()) > 8:
+        cf_worker = cf_worker.strip().rstrip("/")
+        if cf_worker in target_url:
+            return target_url
+        encoded = urllib.parse.quote(target_url, safe="")
+        return f"{cf_worker}/?url={encoded}"
+    return target_url
+
 def login_kemnaker():
     """Melakukan alur SSO Kemnaker dan mengambil Bearer Token secara otomatis"""
     # Jika token manual disediakan via env
@@ -114,7 +125,7 @@ def login_kemnaker():
     }
 
     # 1. Panggil portal naco login untuk mendapatkan redirect dan session cookie
-    req_init = urllib.request.Request("https://maganghub.kemnaker.go.id/api/naco/login?redirect_url=/", headers=browser_headers)
+    req_init = urllib.request.Request(wrap_url("https://maganghub.kemnaker.go.id/api/naco/login?redirect_url=/"), headers=browser_headers)
     try:
         res_init = opener.open(req_init, timeout=12)
         html_init = res_init.read().decode("utf-8", errors="ignore")
@@ -143,7 +154,7 @@ def login_kemnaker():
         "password": KEMNAKER_PASSWORD
     }).encode("utf-8")
 
-    req_login = urllib.request.Request("https://account.kemnaker.go.id/auth/login", data=payload_login, headers={
+    req_login = urllib.request.Request(wrap_url("https://account.kemnaker.go.id/auth/login"), data=payload_login, headers={
         **browser_headers,
         "Content-Type": "application/json",
         "Accept": "application/json, text/plain, */*",
@@ -161,7 +172,7 @@ def login_kemnaker():
 
     # 3. Ikuti URL callback untuk menyelesaikan handshake SSO
     redirect_uri = login_data["data"]["redirect_uri"]
-    req_redir = urllib.request.Request(redirect_uri, headers=browser_headers)
+    req_redir = urllib.request.Request(wrap_url(redirect_uri), headers=browser_headers)
     opener.open(req_redir)
 
     # 4. Ambil token naco_access_token dari cookie
@@ -203,7 +214,7 @@ def periksa_koneksi_dan_status():
     user_name = "Tidak Diketahui"
     mentor_name = "-"
     try:
-        req_me = urllib.request.Request("https://monev-api.maganghub.kemnaker.go.id/api/v1/users/me", headers=headers)
+        req_me = urllib.request.Request(wrap_url("https://monev-api.maganghub.kemnaker.go.id/api/v1/users/me"), headers=headers)
         res_me = urllib.request.urlopen(req_me)
         me_data = json.loads(res_me.read().decode("utf-8")).get("data", {})
         user_name = me_data.get("name", user_name)
@@ -233,7 +244,7 @@ def periksa_absen_hari_ini(token, today_str):
         "Accept": "application/json"
     }
 
-    req = urllib.request.Request("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances", headers=headers)
+    req = urllib.request.Request(wrap_url("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances"), headers=headers)
     res = urllib.request.urlopen(req)
     res_data = json.loads(res.read().decode("utf-8"))
 
@@ -284,7 +295,7 @@ def submit_monev(token, today_str, template):
         "Accept": "application/json"
     }
 
-    url = "https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances/with-daily-log"
+    url = wrap_url("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances/with-daily-log")
     data_bytes = json.dumps(payload).encode("utf-8")
 
     req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")

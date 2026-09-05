@@ -68,15 +68,21 @@ def handle_telegram_command(chat_id, text):
             return f"❌ *Gagal Menjalankan Monev:*\n`{str(e)}`"
 
     elif cmd in ["/proxy"]:
-        proxy = os.getenv("INDONESIA_PROXY")
-        if proxy and len(proxy) > 5:
-            return f"🌐 *Status Proxy Indonesia:*\nAktif: `{proxy}`"
+        cf_proxy = os.getenv("CLOUDFLARE_WORKER_URL")
+        ind_proxy = os.getenv("INDONESIA_PROXY")
+        
+        info = "🌐 *Status Proxy & Jembatan Cloud:*\n\n"
+        if cf_proxy:
+            info += f"⚡ *Cloudflare Reverse Proxy:* Aktif (`{cf_proxy}`)\n"
         else:
-            return (
-                "🌐 *Status Proxy Indonesia:*\n"
-                "Saat ini *belum ada proxy yang disetel* (menggunakan koneksi langsung).\n\n"
-                "Untuk menambahkan proxy, setel variabel `INDONESIA_PROXY` pada Vercel Dashboard -> Settings -> Environment Variables."
-            )
+            info += "⚡ *Cloudflare Reverse Proxy:* Belum disetel (`CLOUDFLARE_WORKER_URL`)\n"
+            
+        if ind_proxy:
+            info += f"🇮🇩 *Indonesia HTTP Proxy:* Aktif (`{ind_proxy}`)\n"
+        else:
+            info += "🇮🇩 *Indonesia HTTP Proxy:* Tidak disetel\n"
+            
+        return info
 
     else:
         return (
