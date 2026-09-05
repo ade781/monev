@@ -21,14 +21,18 @@ def handle_telegram_command(chat_id, text):
             "👋 *Halo! Saya Bot Monev ADE7 Reminder.*\n\n"
             "Bot ini siap membantu monitoring dan pengisian presensi cadangan harian Anda.\n\n"
             "📌 *Perintah yang Tersedia:*\n"
-            "🔹 `/tes` - Tes koneksi ke SSO Kemnaker & cek status absensi hari ini\n"
-            "🔹 `/cek` - Cek riwayat presensi terbaru Anda\n"
-            "🔹 `/monev` - Eksekusi pengisian monev otomatis sekarang\n"
+            "🔹 `/tes` - Tes tembak POST ke Kemnaker & tampilkan pesan asli dari server\n"
+            "🔹 `/cek` - Cek riwayat & status presensi terbaru Anda\n"
+            "🔹 `/monev` - Jalankan pengisian monev cadangan otomatis\n"
             "🔹 `/proxy` - Cek status Cloudflare Reverse Proxy yang aktif\n\n"
             f"🆔 *Chat ID Anda:* `{chat_id}`"
         )
 
-    elif cmd in ["/tes", "/cek", "/status"]:
+    elif cmd in ["/tes"]:
+        msg = monev_bot.test_post_kemnaker()
+        return msg
+
+    elif cmd in ["/cek", "/status"]:
         diag = monev_bot.periksa_koneksi_dan_status()
         if diag.get("success"):
             sudah = diag.get("sudah_absen")
@@ -36,7 +40,7 @@ def handle_telegram_command(chat_id, text):
             ket = "Anda sudah mengisi presensi hari ini secara aman." if sudah else "Belum ada presensi untuk hari ini. Bot akan backup otomatis pukul 21:00 WIB."
             
             return (
-                "🔍 *HASIL TES KONEKSI KEMNAKER*\n\n"
+                "🔍 *HASIL MONITORING KEMNAKER*\n\n"
                 f"👤 *Nama Peserta:* `{diag.get('user_name')}`\n"
                 f"🏢 *Nama Mentor:* `{diag.get('mentor_name')}`\n"
                 f"📅 *Tanggal:* `{diag.get('today_str')}`\n"
@@ -47,7 +51,7 @@ def handle_telegram_command(chat_id, text):
         else:
             err = diag.get("error", "Koneksi gagal")
             return (
-                "⚠️ *HASIL TES KONEKSI KEMNAKER*\n\n"
+                "⚠️ *HASIL MONITORING KEMNAKER*\n\n"
                 f"⏰ *Waktu:* `{diag.get('waktu')}`\n"
                 f"❌ *Status:* Gagal terhubung ke Kemnaker\n"
                 f"🚨 *Pesan:* `{err}`\n\n"

@@ -213,6 +213,51 @@ def periksa_koneksi_dan_status():
         "today_str": today_str
     }
 
+def test_post_kemnaker():
+    """Melakukan pengujian langsung request POST ke endpoint Monev Kemnaker dan mengambil pesan aslinya"""
+    today_wib = datetime.now(WIB)
+    today_str = today_wib.strftime("%Y-%m-%d")
+    template = ambil_template(today_wib)
+    
+    try:
+        token = login_kemnaker()
+    except Exception as e:
+        return f"Gagal login SSO: {e}"
+
+    payload = {
+        "date": today_str,
+        "status": "PRESENT",
+        "activity_log": template["activity"],
+        "lesson_learned": template["learning"],
+        "obstacles": template["obstacles"],
+        "is_reviewed": True
+    }
+
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    url = wrap_url("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances/with-daily-log")
+    data_bytes = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
+
+    try:
+        res = urllib.request.urlopen(req)
+        res_body = json.loads(res.read().decode("utf-8"))
+        return res_body.get("message") or res_body.get("status") or str(res_body)
+    except urllib.error.HTTPError as e:
+        raw_error = e.read().decode("utf-8", errors="ignore")
+        try:
+            err_json = json.loads(raw_error)
+            return err_json.get("message") or err_json.get("error_code") or raw_error
+        except Exception:
+            return raw_error
+    except Exception as e:
+        return str(e)
+
 def periksa_absen_hari_ini(token, today_str):
     """Mengecek apakah hari ini sudah melakukan pengisian di portal Monev"""
     print(f"[2/4] Memeriksa status presensi untuk tanggal {today_str}...")
