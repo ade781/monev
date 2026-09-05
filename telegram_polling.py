@@ -33,9 +33,9 @@ def main():
     try:
         del_url = f"https://api.telegram.org/bot{clean_token}/deleteWebhook"
         urllib.request.urlopen(del_url)
-        print("[Telegram Polling] Webhook berhasil di-reset untuk polling.")
+        print("[Telegram Polling] Webhook berhasil di-reset untuk polling.", flush=True)
     except Exception as e:
-        print(f"[Telegram Polling] Catatan: {e}")
+        print(f"[Telegram Polling] Catatan: {e}", flush=True)
 
     # 2. Cek identitas bot
     me_url = f"https://api.telegram.org/bot{clean_token}/getMe"
@@ -43,13 +43,13 @@ def main():
         res = urllib.request.urlopen(me_url)
         bot_info = json.loads(res.read().decode("utf-8")).get("result", {})
         bot_username = bot_info.get("username", "Bot")
-        print(f"=== TELEGRAM BOT POLLING AKTIF: @{bot_username} ===")
-        print("Silakan buka Telegram di HP / Laptop Anda, cari @" + bot_username + " lalu kirim:")
-        print(" -> /start")
-        print(" -> /tes")
-        print("Tekan Ctrl+C di terminal ini untuk berhenti.\n" + "="*50)
+        print(f"=== TELEGRAM BOT POLLING AKTIF: @{bot_username} ===", flush=True)
+        print("Silakan buka Telegram di HP / Laptop Anda, cari @" + bot_username + " lalu kirim:", flush=True)
+        print(" -> /start", flush=True)
+        print(" -> /tes", flush=True)
+        print("Tekan Ctrl+C di terminal ini untuk berhenti.\n" + "="*50, flush=True)
     except Exception as e:
-        print(f"[ERROR] Gagal memuat info bot Telegram: {e}")
+        print(f"[ERROR] Gagal memuat info bot Telegram: {e}", flush=True)
         return
 
     offset = None
@@ -73,7 +73,7 @@ def main():
                 sender = msg.get("from", {}).get("first_name", "User")
                 text = msg.get("text", "").strip()
 
-                print(f"[PESAN MASUK] Dari {sender} (ID: {chat_id}): '{text}'")
+                print(f"[PESAN MASUK] Dari {sender} (ID: {chat_id}): '{text}'", flush=True)
 
                 # Kirim feedback processing dulu jika command berat
                 if text.startswith(("/tes", "/cek", "/status", "/monev")):
@@ -81,13 +81,13 @@ def main():
 
                 reply = handle_telegram_command(chat_id, text)
                 monev_bot.kirim_telegram(reply, chat_id=chat_id)
-                print(f"[BALASAN TERKIRIM] ke chat {chat_id}\n")
+                print(f"[BALASAN TERKIRIM] ke chat {chat_id}\n", flush=True)
 
         except KeyboardInterrupt:
-            print("\n[STOP] Polling dihentikan oleh pengguna.")
+            print("\n[STOP] Polling dihentikan oleh pengguna.", flush=True)
             break
         except Exception as e:
-            print(f"[Polling Notice] {e}")
+            print(f"[Polling Notice] {e}", flush=True)
             time.sleep(3)
 
 if __name__ == "__main__":
