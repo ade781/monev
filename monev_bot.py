@@ -38,11 +38,12 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-def kirim_telegram(pesan):
+def kirim_telegram(pesan, chat_id=None):
     """Kirim pesan notifikasi ke Telegram via HTTP POST (fail-safe)"""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    target_chat = str(chat_id).strip() if chat_id else (TELEGRAM_CHAT_ID.strip() if TELEGRAM_CHAT_ID else None)
+    if not TELEGRAM_BOT_TOKEN or not target_chat:
         print("[Telegram] Token atau Chat ID belum disetel, skip notifikasi.")
-        return
+        return False
     
     clean_token = TELEGRAM_BOT_TOKEN.strip()
     if clean_token.lower().startswith("bot"):
@@ -50,7 +51,7 @@ def kirim_telegram(pesan):
 
     url = f"https://api.telegram.org/bot{clean_token}/sendMessage"
     payload = json.dumps({
-        "chat_id": TELEGRAM_CHAT_ID.strip(),
+        "chat_id": target_chat,
         "text": pesan,
         "parse_mode": "Markdown"
     }).encode("utf-8")
@@ -58,10 +59,33 @@ def kirim_telegram(pesan):
     req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
     try:
         urllib.request.urlopen(req)
-        print("[Telegram] Notifikasi berhasil terkirim ke Telegram!")
+        print(f"[Telegram] Notifikasi berhasil terkirim ke chat {target_chat}!")
+        return True
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")
+        print(f"[Telegram] Gagal mengirim pesan (HTTP {e.code}): {err_body}")
+        print("[Telegram] Tips: Buka @Cekad_bot di Telegram dan ketuk START terlebih dahulu.")
+        return False
     except Exception as e:
-        print(f"[Telegram] Catatan: Belum bisa mengirim pesan ke Telegram ({e}).")
-        print("[Telegram] Tips: Buka @Cekad_bot di Telegram dan ketuk START.")
+        print(f"[Telegram] Gagal mengirim pesan: {e}")
+        return False
+
+def get_opener():
+    """Membuat HTTP opener dengan cookie processor dan proxy Indonesia jika disetel"""
+    cj = http.cookiejar.CookieJar()
+    handlers = [urllib.request.HTTPCookieProcessor(cj)]
+    
+    proxy = os.getenv("INDONESIA_PROXY")
+    if proxy and len(proxy.strip()) > 5:
+        proxy = proxy.strip()
+        if not proxy.startswith("http://") and not proxy.startswith("https://"):
+            proxy = f"http://{proxy}"
+        print(f"[Proxy] Menggunakan Proxy Indonesia: {proxy}")
+        handlers.append(urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+        
+    opener = urllib.request.build_opener(*handlers)
+    urllib.request.install_opener(opener)
+    return opener, cj
 
 def login_kemnaker():
     """Melakukan alur SSO Kemnaker dan mengambil Bearer Token secara otomatis"""
@@ -72,8 +96,7 @@ def login_kemnaker():
         return manual_token.strip()
 
     print("[1/4] Menginisiasi alur SSO Kemnaker...")
-    cj = http.cookiejar.CookieJar()
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    opener, cj = get_opener()
 
     browser_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
@@ -97,7 +120,7 @@ def login_kemnaker():
     except urllib.error.HTTPError as e:
         err_content = e.read().decode("utf-8", errors="ignore")
         print(f"[ERROR Kemnaker SSO] HTTP {e.code}: {err_content[:200]}")
-        raise Exception(f"Server SSO Kemnaker memblokir request (HTTP {e.code}). Jika di GitHub Actions, server Kemnaker mungkin memblokir IP luar negeri.") from e
+        raise Exception(f"Server SSO Kemnaker memblokir request (HTTP {e.code}). Jika di cloud luar negeri, setel INDONESIA_PROXY.") from e
 
     csrf_match = re.search(r'name="csrf-token"\s+content="([^"]+)"', html_init)
     csrf_token = csrf_match.group(1) if csrf_match else ""
@@ -142,6 +165,53 @@ def login_kemnaker():
 
     print("[1/4] Sukses! Bearer Token berhasil diperoleh secara otomatis.")
     return token
+
+def periksa_koneksi_dan_status():
+    """Fungsi diagnosis lengkap untuk Telegram command /tes"""
+    today_wib = datetime.now(WIB)
+    today_str = today_wib.strftime("%Y-%m-%d")
+    jam_str = today_wib.strftime("%H:%M:%S")
+
+    try:
+        token = login_kemnaker()
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "waktu": f"{today_str} {jam_str} WIB",
+            "today_str": today_str
+        }
+
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+
+    # 1. Ambil data profil
+    user_name = "Tidak Diketahui"
+    mentor_name = "-"
+    try:
+        req_me = urllib.request.Request("https://monev-api.maganghub.kemnaker.go.id/api/v1/users/me", headers=headers)
+        res_me = urllib.request.urlopen(req_me)
+        me_data = json.loads(res_me.read().decode("utf-8")).get("data", {})
+        user_name = me_data.get("name", user_name)
+        mentor_name = me_data.get("mentor_name", mentor_name)
+    except Exception as e:
+        print(f"Gagal memuat profil: {e}")
+
+    # 2. Cek status presensi hari ini
+    sudah_absen, data_absen = periksa_absen_hari_ini(token, today_str)
+
+    return {
+        "success": True,
+        "waktu": f"{today_str} {jam_str} WIB",
+        "user_name": user_name,
+        "mentor_name": mentor_name,
+        "sudah_absen": sudah_absen,
+        "data_absen": data_absen,
+        "today_str": today_str
+    }
 
 def periksa_absen_hari_ini(token, today_str):
     """Mengecek apakah hari ini sudah melakukan pengisian di portal Monev"""
