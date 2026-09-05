@@ -195,9 +195,10 @@ class handler(BaseHTTPRequestHandler):
             }, indent=2).encode("utf-8"))
             return
 
-        # 2. Fitur Pengingat Sore (Jam 17:30 WIB)
+        # 2. Fitur Pengingat (Jam 19:00 Santai & Jam 20:00 Keras)
         if "type" in query_params and query_params["type"][0] == "reminder":
-            result = monev_bot.kirim_pengingat_sore()
+            force_mode = query_params.get("mode", [None])[0]
+            result = monev_bot.kirim_pengingat_monev(force_mode=force_mode)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
