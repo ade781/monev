@@ -44,9 +44,13 @@ def kirim_telegram(pesan):
         print("[Telegram] Token atau Chat ID belum disetel, skip notifikasi.")
         return
     
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    clean_token = TELEGRAM_BOT_TOKEN.strip()
+    if clean_token.lower().startswith("bot"):
+        clean_token = clean_token[3:]
+
+    url = f"https://api.telegram.org/bot{clean_token}/sendMessage"
     payload = json.dumps({
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": TELEGRAM_CHAT_ID.strip(),
         "text": pesan,
         "parse_mode": "Markdown"
     }).encode("utf-8")
@@ -57,20 +61,43 @@ def kirim_telegram(pesan):
         print("[Telegram] Notifikasi berhasil terkirim ke Telegram!")
     except Exception as e:
         print(f"[Telegram] Catatan: Belum bisa mengirim pesan ke Telegram ({e}).")
-        print("[Telegram] Tips: Buka @Cekad_bot di Telegram dan ketuk START agar bot punya izin.")
+        print("[Telegram] Tips: Buka @Cekad_bot di Telegram dan ketuk START.")
 
 def login_kemnaker():
     """Melakukan alur SSO Kemnaker dan mengambil Bearer Token secara otomatis"""
+    # Jika token manual disediakan via env
+    manual_token = os.getenv("KEMNAKER_BEARER_TOKEN")
+    if manual_token and len(manual_token) > 20:
+        print("[1/4] Menggunakan KEMNAKER_BEARER_TOKEN dari environment...")
+        return manual_token.strip()
+
     print("[1/4] Menginisiasi alur SSO Kemnaker...")
     cj = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
 
-    headers = {"User-Agent": USER_AGENT}
+    browser_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Sec-Ch-Ua": '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1"
+    }
 
     # 1. Panggil portal naco login untuk mendapatkan redirect dan session cookie
-    req_init = urllib.request.Request("https://maganghub.kemnaker.go.id/api/naco/login?redirect_url=/", headers=headers)
-    res_init = opener.open(req_init)
-    html_init = res_init.read().decode("utf-8", errors="ignore")
+    req_init = urllib.request.Request("https://maganghub.kemnaker.go.id/api/naco/login?redirect_url=/", headers=browser_headers)
+    try:
+        res_init = opener.open(req_init)
+        html_init = res_init.read().decode("utf-8", errors="ignore")
+    except urllib.error.HTTPError as e:
+        err_content = e.read().decode("utf-8", errors="ignore")
+        print(f"[ERROR Kemnaker SSO] HTTP {e.code}: {err_content[:200]}")
+        raise Exception(f"Server SSO Kemnaker memblokir request (HTTP {e.code}). Jika di GitHub Actions, server Kemnaker mungkin memblokir IP luar negeri.") from e
 
     csrf_match = re.search(r'name="csrf-token"\s+content="([^"]+)"', html_init)
     csrf_token = csrf_match.group(1) if csrf_match else ""
@@ -83,7 +110,7 @@ def login_kemnaker():
     }).encode("utf-8")
 
     req_login = urllib.request.Request("https://account.kemnaker.go.id/auth/login", data=payload_login, headers={
-        **headers,
+        **browser_headers,
         "Content-Type": "application/json",
         "Accept": "application/json, text/plain, */*",
         "X-CSRF-TOKEN": csrf_token,
@@ -100,7 +127,7 @@ def login_kemnaker():
 
     # 3. Ikuti URL callback untuk menyelesaikan handshake SSO
     redirect_uri = login_data["data"]["redirect_uri"]
-    req_redir = urllib.request.Request(redirect_uri, headers=headers)
+    req_redir = urllib.request.Request(redirect_uri, headers=browser_headers)
     opener.open(req_redir)
 
     # 4. Ambil token naco_access_token dari cookie
