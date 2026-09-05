@@ -1,0 +1,239 @@
+#!/usr/bin/env python3
+"""
+MONEV AUTOMATION BACKUP BOT - MAGANGHUB KEMNAKER
+Zero-dependency Python script: standard library only (urllib, http.cookiejar, json, os).
+"""
+
+import os
+import re
+import json
+import urllib.request
+import urllib.parse
+import http.cookiejar
+from datetime import datetime, timezone, timedelta
+
+# Load file .env lokal jika tersedia (tanpa dependency eksternal)
+def load_dotenv(env_path=".env"):
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, val = line.split("=", 1)
+                    os.environ.setdefault(key.strip(), val.strip().strip("'\""))
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+# Zona Waktu Indonesia Barat (WIB = UTC+7)
+WIB = timezone(timedelta(hours=7))
+
+# Konfigurasi dari Environment Variables
+KEMNAKER_USERNAME = os.getenv("KEMNAKER_USERNAME")
+KEMNAKER_PASSWORD = os.getenv("KEMNAKER_PASSWORD")
+OFFICE_LAT = float(os.getenv("OFFICE_LAT", "-7.8981812"))
+OFFICE_LONG = float(os.getenv("OFFICE_LONG", "110.0499084"))
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+def kirim_telegram(pesan):
+    """Kirim pesan notifikasi ke Telegram via HTTP POST"""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("[Telegram] Token atau Chat ID belum disetel, skip notifikasi.")
+        return
+    
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = json.dumps({
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": pesan,
+        "parse_mode": "Markdown"
+    }).encode("utf-8")
+
+    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req)
+        print("[Telegram] Notifikasi berhasil terkirim ke Telegram!")
+    except Exception as e:
+        print(f"[Telegram] Gagal mengirim notifikasi: {e}")
+
+def login_kemnaker():
+    """Melakukan alur SSO Kemnaker dan mengambil Bearer Token secara otomatis"""
+    print("[1/4] Menginisiasi alur SSO Kemnaker...")
+    cj = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+
+    headers = {"User-Agent": USER_AGENT}
+
+    # 1. Panggil portal naco login untuk mendapatkan redirect dan session cookie
+    req_init = urllib.request.Request("https://maganghub.kemnaker.go.id/api/naco/login?redirect_url=/", headers=headers)
+    res_init = opener.open(req_init)
+    html_init = res_init.read().decode("utf-8", errors="ignore")
+
+    csrf_match = re.search(r'name="csrf-token"\s+content="([^"]+)"', html_init)
+    csrf_token = csrf_match.group(1) if csrf_match else ""
+
+    # 2. Kirim kredensial ke SSO account.kemnaker.go.id
+    print("[1/4] Mengirim autentikasi kredensial pengguna...")
+    payload_login = json.dumps({
+        "username": KEMNAKER_USERNAME,
+        "password": KEMNAKER_PASSWORD
+    }).encode("utf-8")
+
+    req_login = urllib.request.Request("https://account.kemnaker.go.id/auth/login", data=payload_login, headers={
+        **headers,
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/plain, */*",
+        "X-CSRF-TOKEN": csrf_token,
+        "X-Requested-With": "XMLHttpRequest",
+        "Origin": "https://account.kemnaker.go.id",
+        "Referer": res_init.geturl()
+    })
+
+    res_login = opener.open(req_login)
+    login_data = json.loads(res_login.read().decode("utf-8"))
+
+    if not login_data.get("data", {}).get("authenticated"):
+        raise Exception(f"Autentikasi gagal: {login_data}")
+
+    # 3. Ikuti URL callback untuk menyelesaikan handshake SSO
+    redirect_uri = login_data["data"]["redirect_uri"]
+    req_redir = urllib.request.Request(redirect_uri, headers=headers)
+    opener.open(req_redir)
+
+    # 4. Ambil token naco_access_token dari cookie
+    token = None
+    for cookie in cj:
+        if cookie.name == "naco_access_token":
+            token = cookie.value
+            break
+
+    if not token:
+        raise Exception("Gagal mengekstrak naco_access_token dari handshake cookies!")
+
+    print("[1/4] Sukses! Bearer Token berhasil diperoleh secara otomatis.")
+    return token
+
+def periksa_absen_hari_ini(token, today_str):
+    """Mengecek apakah hari ini sudah melakukan pengisian di portal Monev"""
+    print(f"[2/4] Memeriksa status presensi untuk tanggal {today_str}...")
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+
+    req = urllib.request.Request("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances", headers=headers)
+    res = urllib.request.urlopen(req)
+    res_data = json.loads(res.read().decode("utf-8"))
+
+    attendances = res_data.get("data", [])
+    for item in attendances:
+        if item.get("date") == today_str:
+            return True, item
+
+    return False, None
+
+def ambil_template(today_wib):
+    """Mengambil template kegiatan berdasarkan urutan hari"""
+    template_file = os.path.join(os.path.dirname(__file__), "templates.json")
+    if os.path.exists(template_file):
+        with open(template_file, "r", encoding="utf-8") as f:
+            templates = json.load(f)
+    else:
+        templates = [
+          {
+            "activity": "Melakukan penelusuran modul fungsional aplikasi serta dokumentasi teknis pendukung.",
+            "learning": "Mempelajari alur integrasi sistem data dan prosedur validasi parameter operasional.",
+            "obstacles": "Tidak ada kendala yang berarti, seluruh tugas berjalan dengan lancar."
+          }
+        ]
+    
+    # Rotasi template berdasarkan hari ke-berapa dalam setahun
+    day_of_year = today_wib.timetuple().tm_yday
+    return templates[day_of_year % len(templates)]
+
+def submit_monev(token, today_str, template):
+    """Mengirim presensi dan laporan harian ke endpoint Kemnaker"""
+    print(f"[3/4] Menyiapkan pengiriman laporan otomatis untuk tanggal {today_str}...")
+
+    # Format payload resmi Kemnaker
+    payload = {
+        "date": today_str,
+        "attendance_status": "Hadir",
+        "activity_log": f"Uraian Aktivitas\n{template['activity']}",
+        "activity_description": f"Uraian Aktivitas\n{template['activity']}",
+        "lesson_learned": f"Pembelajaran yang Diperoleh\n{template['learning']}",
+        "learning": f"Pembelajaran yang Diperoleh\n{template['learning']}",
+        "obstacles": template['obstacles'],
+        "is_reviewed": True,
+        "latitude": OFFICE_LAT,
+        "longitude": OFFICE_LONG
+    }
+
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    url = "https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances/with-daily-log"
+    data_bytes = json.dumps(payload).encode("utf-8")
+
+    req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
+    try:
+        res = urllib.request.urlopen(req)
+        res_body = json.loads(res.read().decode("utf-8"))
+        return res_body
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="ignore")
+        print(f"[ERROR Kemnaker API] HTTP {e.code}: {error_body}")
+        raise Exception(f"Server Kemnaker menolak pengiriman: {error_body}") from e
+
+def main():
+    today_wib = datetime.now(WIB)
+    today_str = today_wib.strftime("%Y-%m-%d")
+    jam_str = today_wib.strftime("%H:%M:%S")
+
+    print(f"=== MONEV AUTO BOT RUNNER ===")
+    print(f"Waktu Sekarang: {today_str} {jam_str} WIB")
+
+    try:
+        # 1. Login Otomatis
+        token = login_kemnaker()
+
+        # 2. Cek apakah sudah absen hari ini
+        sudah_absen, data_absen = periksa_absen_hari_ini(token, today_str)
+        if sudah_absen:
+            print(f"[AMAN] Anda sudah mengisi presensi tanggal {today_str} secara manual (Status: {data_absen.get('status')}).")
+            print("Bot tidak perlu melakukan aksi apa pun. Program selesai.")
+            return
+
+        # 3. Jika belum absen, kirim otomatis
+        print(f"[PERINGATAN] Anda belum mengisi presensi untuk tanggal {today_str}!")
+        template = ambil_template(today_wib)
+        
+        hasil = submit_monev(token, today_str, template)
+        print(f"[BERHASIL] Laporan berhasil disubmit ke server Kemnaker: {hasil}")
+
+        # 4. Kirim notifikasi Telegram
+        pesan_notif = (
+            f"✅ *Monev MagangHub Terisi Otomatis!*\n\n"
+            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+            f"📍 *Lokasi:* `{OFFICE_LAT}, {OFFICE_LONG}`\n\n"
+            f"📝 *Aktivitas:*\n_{template['activity']}_\n\n"
+            f"💡 *Pembelajaran:*\n_{template['learning']}_\n\n"
+            f"Laporan cadangan berhasil disubmit karena Anda belum mengisi sebelum jadwal bot."
+        )
+        kirim_telegram(pesan_notif)
+
+    except Exception as e:
+        pesan_error = f"⚠️ *Gagal Auto-Monev Magang!*\nTerjadi kendala pada {today_str} {jam_str} WIB:\n`{str(e)}`"
+        print(f"[ERROR] {e}")
+        kirim_telegram(pesan_error)
+        raise e
+
+if __name__ == "__main__":
+    main()

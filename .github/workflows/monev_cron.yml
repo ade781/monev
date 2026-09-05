@@ -1,0 +1,29 @@
+name: Auto Monev Backup Scheduler
+
+on:
+  schedule:
+    # Berjalan otomatis setiap Senin - Jumat jam 14:00 UTC (21:00 WIB)
+    - cron: '0 14 * * 1-5'
+  workflow_dispatch: # Tombol 'Run workflow' manual di dashboard GitHub
+
+jobs:
+  run-monev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Monev Auto Bot
+        env:
+          KEMNAKER_USERNAME: ${{ secrets.KEMNAKER_USERNAME }}
+          KEMNAKER_PASSWORD: ${{ secrets.KEMNAKER_PASSWORD }}
+          OFFICE_LAT: ${{ secrets.OFFICE_LAT }}
+          OFFICE_LONG: ${{ secrets.OFFICE_LONG }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python monev_bot.py

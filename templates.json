@@ -1,0 +1,27 @@
+[
+  {
+    "activity": "Melanjutkan pengembangan dan implementasi fitur operasional pada aplikasi sistem kerja serta melakukan integrasi antarmuka dengan endpoint REST API yang relevan.",
+    "learning": "Mendalami mekanisme komunikasi data berbasis asynchronous request, penanganan struktur JSON, serta standardisasi status response HTTP pada aplikasi web.",
+    "obstacles": "Penyesuaian format parameter data antara antarmuka pengguna dan spesifikasi layanan backend memerlukan beberapa kali pengujian validasi menyeluruh."
+  },
+  {
+    "activity": "Melakukan penelusuran validasi data input, rekapitulasi checklist komponen proteksi dan peralatan, serta pengujian berkala pada alur verifikasi data sistem.",
+    "learning": "Mempelajari prosedur standardisasi audit data lapangan, tata kelola administrasi dokumen teknis, dan mitigasi kendala pencatatan log aktivitas operasional.",
+    "obstacles": "Memerlukan sinkronisasi dan koordinasi berkala terhadap dokumentasi alur teknis bersama tim kerja guna memastikan konsistensi fungsi seluruh modul."
+  },
+  {
+    "activity": "Melakukan pemeliharaan fitur antarmuka pengguna, optimasi alur navigasi menu dashboard, dan perapian struktur kode program agar lebih modular dan efisien.",
+    "learning": "Memahami penerapan prinsip clean code, pemisahan tanggung jawab antarmuka, serta peningkatan efisiensi pengelolaan state aplikasi pada sistem monitoring.",
+    "obstacles": "Pengujian pada beberapa skenario edge case memerlukan waktu tambahan untuk memastikan tidak ada gangguan pada integrasi modul pendukung lainnya."
+  },
+  {
+    "activity": "Melakukan monitoring kesiapan sarana dan prasarana pendukung operasional serta sinkronisasi data kegiatan harian bersama pembimbing lapangan di unit kerja.",
+    "learning": "Meningkatkan pemahaman mengenai alur tata kelola operasional teknologi informasi dan pentingnya koordinasi berkala antar lini kerja di lingkungan institusi.",
+    "obstacles": "Fluktuasi koneksi jaringan saat proses sinkronisasi data operasional memerlukan mekanisme verifikasi ulang agar seluruh data tersimpan dengan sempurna."
+  },
+  {
+    "activity": "Menyusun rekapitulasi evaluasi progres capaian mingguan serta menyusun ringkasan laporan hasil pemantauan kegiatan untuk dokumentasi pertanggungjawaban.",
+    "learning": "Melatih kemampuan analisis evaluasi capaian kinerja berkala serta penyusunan rekomendasi perbaikan dan dokumentasi teknis yang terstruktur rapi.",
+    "obstacles": "Seluruh target kegiatan harian dapat diselesaikan dengan baik dan tidak ada hambatan teknis yang berarti selama pelaksanaan tugas berlangsung."
+  }
+]
