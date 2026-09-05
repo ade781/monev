@@ -46,7 +46,7 @@ def main():
         res = direct_opener.open(me_url, timeout=10)
         bot_info = json.loads(res.read().decode("utf-8")).get("result", {})
         bot_username = bot_info.get("username", "Bot")
-        print(f"=== TELEGRAM BOT POLLING AKTIF: @{bot_username} ===", flush=True)
+        print(f"=== TELEGRAM BOT POLLING AKTIF: Monev ADE7 Reminder (@{bot_username}) ===", flush=True)
         print("Silakan buka Telegram di HP / Laptop Anda, cari @" + bot_username + " lalu kirim:", flush=True)
         print(" -> /start", flush=True)
         print(" -> /tes", flush=True)

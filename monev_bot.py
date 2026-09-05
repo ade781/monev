@@ -291,7 +291,7 @@ def main():
     today_str = today_wib.strftime("%Y-%m-%d")
     jam_str = today_wib.strftime("%H:%M:%S")
 
-    print(f"=== MONEV AUTO BOT RUNNER ===")
+    print(f"=== MONEV ADE7 REMINDER RUNNER ===")
     print(f"Waktu Sekarang: {today_str} {jam_str} WIB")
 
     try:
@@ -314,7 +314,7 @@ def main():
 
         # 4. Kirim notifikasi Telegram
         pesan_notif = (
-            f"✅ *Monev MagangHub Terisi Otomatis!*\n\n"
+            f"✅ *Monev ADE7 Reminder - Terisi Otomatis!*\n\n"
             f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
             f"📍 *Lokasi:* `{OFFICE_LAT}, {OFFICE_LONG}`\n\n"
             f"📝 *Aktivitas:*\n_{template['activity']}_\n\n"
@@ -325,7 +325,7 @@ def main():
         return {"status": "submitted", "date": today_str, "result": hasil}
 
     except Exception as e:
-        pesan_error = f"⚠️ *Gagal Auto-Monev Magang!*\nTerjadi kendala pada {today_str} {jam_str} WIB:\n`{str(e)}`"
+        pesan_error = f"⚠️ *Monev ADE7 Reminder - Gagal Auto Absen!*\nTerjadi kendala pada {today_str} {jam_str} WIB:\n`{str(e)}`"
         print(f"[ERROR] {e}")
         kirim_telegram(pesan_error)
         raise e

@@ -18,13 +18,13 @@ def handle_telegram_command(chat_id, text):
 
     if cmd in ["/start", "/help", "/bantuan"]:
         return (
-            "👋 *Halo! Saya Bot Monev MagangHub Kemnaker.*\n\n"
+            "👋 *Halo! Saya Bot Monev ADE7 Reminder.*\n\n"
             "Bot ini siap membantu monitoring dan pengisian presensi cadangan harian Anda.\n\n"
             "📌 *Perintah yang Tersedia:*\n"
             "🔹 `/tes` - Tes koneksi ke SSO Kemnaker & cek status absensi hari ini\n"
             "🔹 `/cek` - Cek riwayat presensi terbaru Anda\n"
             "🔹 `/monev` - Eksekusi pengisian monev otomatis sekarang\n"
-            "🔹 `/proxy` - Cek status proxy Indonesia yang aktif\n\n"
+            "🔹 `/proxy` - Cek status Cloudflare Reverse Proxy yang aktif\n\n"
             f"🆔 *Chat ID Anda:* `{chat_id}`"
         )
 
