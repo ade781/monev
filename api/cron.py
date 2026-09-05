@@ -51,7 +51,7 @@ def handle_telegram_command(chat_id, text):
                 f"⏰ *Waktu:* `{diag.get('waktu')}`\n"
                 f"❌ *Status:* Gagal terhubung ke Kemnaker\n"
                 f"🚨 *Pesan:* `{err}`\n\n"
-                "💡 *Solusi:* Jika error berupa HTTP 403 Forbidden (Cloudflare memblokir IP cloud Vercel di luar negeri), pastikan `INDONESIA_PROXY` telah dipasang di Environment Variables Vercel."
+                "💡 *Solusi:* Pastikan variabel `CLOUDFLARE_WORKER_URL` sudah dipasang di Environment Variables Vercel."
             )
 
     elif cmd in ["/monev", "/run", "/submit"]:
@@ -69,20 +69,13 @@ def handle_telegram_command(chat_id, text):
 
     elif cmd in ["/proxy"]:
         cf_proxy = os.getenv("CLOUDFLARE_WORKER_URL")
-        ind_proxy = os.getenv("INDONESIA_PROXY")
-        
-        info = "🌐 *Status Proxy & Jembatan Cloud:*\n\n"
         if cf_proxy:
-            info += f"⚡ *Cloudflare Reverse Proxy:* Aktif (`{cf_proxy}`)\n"
+            return f"🌐 *Status Cloudflare Reverse Proxy:*\n✅ Aktif: `{cf_proxy}`"
         else:
-            info += "⚡ *Cloudflare Reverse Proxy:* Belum disetel (`CLOUDFLARE_WORKER_URL`)\n"
-            
-        if ind_proxy:
-            info += f"🇮🇩 *Indonesia HTTP Proxy:* Aktif (`{ind_proxy}`)\n"
-        else:
-            info += "🇮🇩 *Indonesia HTTP Proxy:* Tidak disetel\n"
-            
-        return info
+            return (
+                "🌐 *Status Cloudflare Reverse Proxy:*\n"
+                "⚠️ Belum disetel. Tambahkan variabel `CLOUDFLARE_WORKER_URL` di Vercel Settings -> Environment Variables."
+            )
 
     else:
         return (

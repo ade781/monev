@@ -73,19 +73,9 @@ def kirim_telegram(pesan, chat_id=None):
         return False
 
 def get_opener():
-    """Membuat HTTP opener dengan cookie processor dan proxy Indonesia jika disetel"""
+    """Membuat HTTP opener dengan cookie processor standar"""
     cj = http.cookiejar.CookieJar()
-    handlers = [urllib.request.HTTPCookieProcessor(cj)]
-    
-    proxy = os.getenv("INDONESIA_PROXY")
-    if proxy and len(proxy.strip()) > 5:
-        proxy = proxy.strip()
-        if not proxy.startswith("http://") and not proxy.startswith("https://"):
-            proxy = f"http://{proxy}"
-        print(f"[Proxy] Menggunakan Proxy Indonesia: {proxy}")
-        handlers.append(urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
-        
-    opener = urllib.request.build_opener(*handlers)
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
     return opener, cj
 
 def wrap_url(target_url):
@@ -101,7 +91,6 @@ def wrap_url(target_url):
 
 def login_kemnaker():
     """Melakukan alur SSO Kemnaker dan mengambil Bearer Token secara otomatis"""
-    # Jika token manual disediakan via env
     manual_token = os.getenv("KEMNAKER_BEARER_TOKEN")
     if manual_token and len(manual_token) > 20:
         print("[1/4] Menggunakan KEMNAKER_BEARER_TOKEN dari environment...")
@@ -127,21 +116,10 @@ def login_kemnaker():
     # 1. Panggil portal naco login untuk mendapatkan redirect dan session cookie
     req_init = urllib.request.Request(wrap_url("https://maganghub.kemnaker.go.id/api/naco/login?redirect_url=/"), headers=browser_headers)
     try:
-        res_init = opener.open(req_init, timeout=12)
+        res_init = opener.open(req_init, timeout=15)
         html_init = res_init.read().decode("utf-8", errors="ignore")
     except Exception as e:
-        proxy_env = os.getenv("INDONESIA_PROXY")
-        # Jika proxy gagal/timeout, coba fallback ke koneksi langsung
-        if proxy_env:
-            print(f"[Proxy Fallback] Proxy {proxy_env} gagal ({e}), mencoba koneksi langsung...")
-            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj), urllib.request.ProxyHandler({}))
-            try:
-                res_init = opener.open(req_init, timeout=12)
-                html_init = res_init.read().decode("utf-8", errors="ignore")
-            except Exception as direct_err:
-                raise Exception(f"Gagal koneksi SSO Kemnaker (Proxy & Direct): {direct_err}") from direct_err
-        else:
-            raise e
+        raise Exception(f"Gagal koneksi SSO Kemnaker: {e}") from e
 
 
     csrf_match = re.search(r'name="csrf-token"\s+content="([^"]+)"', html_init)
