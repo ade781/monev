@@ -233,7 +233,7 @@ def main():
         if sudah_absen:
             print(f"[AMAN] Anda sudah mengisi presensi tanggal {today_str} secara manual (Status: {data_absen.get('status')}).")
             print("Bot tidak perlu melakukan aksi apa pun. Program selesai.")
-            return
+            return {"status": "already_submitted", "date": today_str, "details": data_absen}
 
         # 3. Jika belum absen, kirim otomatis
         print(f"[PERINGATAN] Anda belum mengisi presensi untuk tanggal {today_str}!")
@@ -252,6 +252,7 @@ def main():
             f"Laporan cadangan berhasil disubmit karena Anda belum mengisi sebelum jadwal bot."
         )
         kirim_telegram(pesan_notif)
+        return {"status": "submitted", "date": today_str, "result": hasil}
 
     except Exception as e:
         pesan_error = f"⚠️ *Gagal Auto-Monev Magang!*\nTerjadi kendala pada {today_str} {jam_str} WIB:\n`{str(e)}`"

@@ -10,13 +10,13 @@ import monev_bot
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            monev_bot.main()
+            result = monev_bot.main()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             response = {
                 "status": "success",
-                "message": "Monev Bot dijalankan dengan sukses!"
+                "result": result
             }
             self.wfile.write(json.dumps(response).encode("utf-8"))
         except Exception as e:
