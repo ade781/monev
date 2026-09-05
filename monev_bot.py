@@ -373,7 +373,7 @@ def submit_monev(token, today_str, template, custom_activity=None):
         raise Exception(f"Server Kemnaker menolak pengiriman: {error_body}") from e
 
 def muat_template_pengingat():
-    """Memuat 100 template pengingat (50 santai jam 19 & 50 keras jam 20) dari reminder_templates.json"""
+    """Memuat 300 template pengingat (150 santai jam 19 & 150 keras jam 20) dari reminder_templates.json"""
     path_file = os.path.join(os.path.dirname(__file__), "reminder_templates.json")
     if os.path.exists(path_file):
         try:
