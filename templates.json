@@ -7,12 +7,12 @@
   {
     "activity": "Melakukan penelusuran validasi data input, rekapitulasi checklist komponen proteksi dan peralatan, serta pengujian berkala pada alur verifikasi data sistem.",
     "learning": "Mempelajari prosedur standardisasi audit data lapangan, tata kelola administrasi dokumen teknis, dan mitigasi kendala pencatatan log aktivitas operasional.",
-    "obstacles": "Memerlukan sinkronisasi dan koordinasi berkala terhadap dokumentasi alur teknis bersama tim kerja guna memastikan konsistensi fungsi seluruh modul."
+    "obstacles": "Memerlukan koordinasi teknis berkala bersama tim kerja guna memastikan konsistensi fungsi seluruh modul pendukung."
   },
   {
     "activity": "Melakukan pemeliharaan fitur antarmuka pengguna, optimasi alur navigasi menu dashboard, dan perapian struktur kode program agar lebih modular dan efisien.",
-    "learning": "Memahami penerapan prinsip clean code, pemisahan tanggung jawab antarmuka, serta peningkatan efisiensi pengelolaan state aplikasi pada sistem monitoring.",
-    "obstacles": "Pengujian pada beberapa skenario edge case memerlukan waktu tambahan untuk memastikan tidak ada gangguan pada integrasi modul pendukung lainnya."
+    "learning": "Memahami penerapan prinsip clean code, pemisahan tanggung jawab komponen antarmuka, serta peningkatan efisiensi pengelolaan state aplikasi.",
+    "obstacles": "Pengujian pada beberapa skenario interaksi pengguna memerlukan penyesuaian tata letak agar tetap responsif di berbagai resolusi layar."
   },
   {
     "activity": "Melakukan monitoring kesiapan sarana dan prasarana pendukung operasional serta sinkronisasi data kegiatan harian bersama pembimbing lapangan di unit kerja.",
@@ -23,5 +23,55 @@
     "activity": "Menyusun rekapitulasi evaluasi progres capaian mingguan serta menyusun ringkasan laporan hasil pemantauan kegiatan untuk dokumentasi pertanggungjawaban.",
     "learning": "Melatih kemampuan analisis evaluasi capaian kinerja berkala serta penyusunan rekomendasi perbaikan dan dokumentasi teknis yang terstruktur rapi.",
     "obstacles": "Seluruh target kegiatan harian dapat diselesaikan dengan baik dan tidak ada hambatan teknis yang berarti selama pelaksanaan tugas berlangsung."
+  },
+  {
+    "activity": "Menganalisis performa query database dan melakukan optimasi struktur endpoint API untuk mempercepat response time data pemantauan.",
+    "learning": "Memahami konsep indexing tabel, efisiensi penulisan query relasional, serta penerapan caching untuk meminimalisir beban request server.",
+    "obstacles": "Pemeriksaan konsistensi relasi foreign key pada beberapa skema data lama memerlukan analisis perbandingan manual."
+  },
+  {
+    "activity": "Melakukan pengujian fungsional modul (User Acceptance Testing) dan pencatatan bug tracking pada fitur autentikasi dan otorisasi sistem.",
+    "learning": "Mendalami metodologi pengujian perangkat lunak sistematis, verifikasi skenario kegagalan login, dan validasi masa berlaku token sesi pengguna.",
+    "obstacles": "Penelusuran log error pada skenario sesi kedaluwarsa memerlukan replikasi kondisi jaringan yang bervariasi."
+  },
+  {
+    "activity": "Mempelajari dan menerapkan konfigurasi mekanisme keamanan dasar pada antarmuka komunikasi web service serta validasi sanitasi input formulir.",
+    "learning": "Memahami ancaman injeksi data, mitigasi Cross-Site Scripting (XSS), dan penerapan header keamanan HTTP pada routing aplikasi.",
+    "obstacles": "Perlu penyesuaian aturan regex sanitasi agar tidak memotong karakter khusus yang sah pada data input pengguna."
+  },
+  {
+    "activity": "Membantu proses backup dan verifikasi integritas data transaksi operasional sistem secara terjadwal bersama tim teknis infrastruktur.",
+    "learning": "Mempelajari prosedur baku pengelolaan snapshot database, enkripsi media penyimpanan cadangan, serta skenario Disaster Recovery.",
+    "obstacles": "Waktu transfer arsip data backup berukuran besar membutuhkan alokasi bandwidth jaringan yang stabil dan pengawasan berkala."
+  },
+  {
+    "activity": "Melakukan refactoring pada fungsi-fungsi utility bersama dan menyusun standarisasi error handling agar pesan kesalahan sistem lebih informatif.",
+    "learning": "Memahami arsitektur penanganan exception terpusat, logging hirarkis, dan pembuatan response payload error yang seragam.",
+    "obstacles": "Sinkronisasi kode lama dengan modul utility baru memerlukan regression testing agar tidak merusak fungsi yang sudah stabil."
+  },
+  {
+    "activity": "Melakukan eksplorasi integrasi webhook otomatisasi notifikasi operasional guna meningkatkan visibilitas status layanan secara real-time.",
+    "learning": "Mempelajari arsitektur event-driven architecture, payload signing webhook, dan mekanisme retry otomatis saat endpoint tujuan sibuk.",
+    "obstacles": "Pengujian timeout pada webhook memerlukan mock server lokal untuk menyimulasikan berbagai kondisi latensi jaringan."
+  },
+  {
+    "activity": "Mengikuti sesi sinkronisasi mingguan bersama mentor unit kerja serta mendokumentasikan poin evaluasi teknis dan arahan perbaikan sistem.",
+    "learning": "Meningkatkan kemampuan komunikasi profesional, penerimaan umpan balik teknis, serta penyelarasan prioritas pengerjaan tugas magang.",
+    "obstacles": "Diskusi teknis berjalan sangat produktif dan seluruh catatan evaluasi berhasil didokumentasikan dengan lengkap."
+  },
+  {
+    "activity": "Melakukan penataan dokumentasi API (API Documentation) dan panduan instalasi modul sistem kerja untuk memudahkan pemeliharaan berkelanjutan.",
+    "learning": "Memahami standardisasi dokumentasi teknis OpenApi/Swagger dan penyusunan panduan pengembang (Developer Guide) yang terstruktur.",
+    "obstacles": "Menyelaraskan deskripsi parameter data dengan perubahan versi payload terbaru membutuhkan pengecekan ulang seluruh endpoint."
+  },
+  {
+    "activity": "Melakukan simulasi stress testing dan monitoring penggunaan resource komputasi pada server aplikasi saat menerima lonjakan request.",
+    "learning": "Mempelajari metrik penggunaan CPU, memory consumption, thread pool concurrency, serta identifikasi bottleneck performa sistem.",
+    "obstacles": "Keterbatasan resource lingkungan staging memerlukan kalibrasi beban uji agar tidak membebani layanan yang sedang aktif."
+  },
+  {
+    "activity": "Melakukan verifikasi kelengkapan checklist kepatuhan standar operasional prosedur (SOP) teknologi informasi pada lingkungan kerja.",
+    "learning": "Memahami kerangka kerja tata kelola TI, manajemen kepatuhan operasional, serta pentingnya disiplin pelaporan aktivitas harian.",
+    "obstacles": "Seluruh aktivitas verifikasi dan pelaporan harian terlaksana dengan lancar sesuai target yang telah ditetapkan."
   }
 ]

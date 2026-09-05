@@ -7,6 +7,8 @@ Zero-dependency Python script: standard library only (urllib, http.cookiejar, js
 import os
 import re
 import json
+import time
+import random
 import urllib.request
 import urllib.parse
 import http.cookiejar
@@ -38,11 +40,31 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-def kirim_telegram(pesan, chat_id=None):
+# Menu tombol interaktif Inline Keyboard Telegram
+MENU_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "🔍 Cek Presensi", "callback_data": "/cek"},
+            {"text": "🧪 Tes Pesan", "callback_data": "/tes"}
+        ],
+        [
+            {"text": "⚡ Eksekusi Monev", "callback_data": "/monev"},
+            {"text": "📊 Rekap Minggu Ini", "callback_data": "/rekap"}
+        ]
+    ]
+}
+
+def get_jittered_coordinates():
+    """Memberikan deviasi mikro alami (~10-25 meter) pada koordinat GPS agar natural seperti HP asli"""
+    delta_lat = random.uniform(-0.00015, 0.00015)
+    delta_long = random.uniform(-0.00015, 0.00015)
+    return round(OFFICE_LAT + delta_lat, 7), round(OFFICE_LONG + delta_long, 7)
+
+def kirim_telegram(pesan, chat_id=None, reply_markup=None):
     """Kirim pesan notifikasi ke Telegram via HTTP POST (fail-safe)"""
     target_chat = str(chat_id).strip() if chat_id else (TELEGRAM_CHAT_ID.strip() if TELEGRAM_CHAT_ID else None)
     if not TELEGRAM_BOT_TOKEN or not target_chat:
-        print("[Telegram] Token atau Chat ID belum disetel, skip notifikasi.")
+        print("[Telegram] Token atau Chat ID belum disetel, skip notifikasi.", flush=True)
         return False
     
     clean_token = TELEGRAM_BOT_TOKEN.strip()
@@ -50,26 +72,28 @@ def kirim_telegram(pesan, chat_id=None):
         clean_token = clean_token[3:]
 
     url = f"https://api.telegram.org/bot{clean_token}/sendMessage"
-    payload = json.dumps({
+    payload_dict = {
         "chat_id": target_chat,
         "text": pesan,
         "parse_mode": "Markdown"
-    }).encode("utf-8")
+    }
+    if reply_markup:
+        payload_dict["reply_markup"] = reply_markup
 
+    payload = json.dumps(payload_dict).encode("utf-8")
     req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
     try:
         # Selalu gunakan koneksi direct untuk Telegram API (jangan lewat proxy)
         direct_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         direct_opener.open(req, timeout=10)
-        print(f"[Telegram] Notifikasi berhasil terkirim ke chat {target_chat}!")
+        print(f"[Telegram] Notifikasi berhasil terkirim ke chat {target_chat}!", flush=True)
         return True
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[Telegram] Gagal mengirim pesan (HTTP {e.code}): {err_body}")
-        print("[Telegram] Tips: Buka @Cekad_bot di Telegram dan ketuk START terlebih dahulu.")
+        print(f"[Telegram] Gagal mengirim pesan (HTTP {e.code}): {err_body}", flush=True)
         return False
     except Exception as e:
-        print(f"[Telegram] Gagal mengirim pesan: {e}")
+        print(f"[Telegram] Gagal mengirim pesan: {e}", flush=True)
         return False
 
 def get_opener():
@@ -213,21 +237,32 @@ def periksa_koneksi_dan_status():
         "today_str": today_str
     }
 
-def test_post_kemnaker():
-    """Melakukan pengujian langsung request POST ke endpoint Monev Kemnaker dan mengambil pesan aslinya"""
+def test_post_kemnaker(custom_activity=None):
+    """Melakukan pengujian langsung request POST ke endpoint Monev Kemnaker dengan koordinat jitter & template dinamis"""
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
     template = ambil_template(today_wib)
     
+    # Fitur 1: Human jitter (jeda mikro acak 1.5 - 3.5 detik)
+    time.sleep(random.uniform(1.5, 3.5))
+
     try:
         token = login_kemnaker()
     except Exception as e:
         return f"Gagal login SSO: {e}"
 
+    # Fitur 2: Micro GPS Jitter
+    lat, long = get_jittered_coordinates()
+
+    # Fitur 5: Kustom aktivitas jika disediakan
+    activity = custom_activity.strip() if custom_activity else template["activity"]
+
     payload = {
         "date": today_str,
         "status": "PRESENT",
-        "activity_log": template["activity"],
+        "latitude": lat,
+        "longitude": long,
+        "activity_log": activity,
         "lesson_learned": template["learning"],
         "obstacles": template["obstacles"],
         "is_reviewed": True
@@ -260,7 +295,7 @@ def test_post_kemnaker():
 
 def periksa_absen_hari_ini(token, today_str):
     """Mengecek apakah hari ini sudah melakukan pengisian di portal Monev"""
-    print(f"[2/4] Memeriksa status presensi untuk tanggal {today_str}...")
+    print(f"[2/4] Memeriksa status presensi untuk tanggal {today_str}...", flush=True)
     headers = {
         "User-Agent": USER_AGENT,
         "Authorization": f"Bearer {token}",
@@ -279,7 +314,7 @@ def periksa_absen_hari_ini(token, today_str):
     return False, None
 
 def ambil_template(today_wib):
-    """Mengambil template kegiatan berdasarkan urutan hari"""
+    """Mengambil template kegiatan bervariasi cerdas berdasarkan kombinasi hari & minggu"""
     template_file = os.path.join(os.path.dirname(__file__), "templates.json")
     if os.path.exists(template_file):
         with open(template_file, "r", encoding="utf-8") as f:
@@ -293,19 +328,25 @@ def ambil_template(today_wib):
           }
         ]
     
-    # Rotasi template berdasarkan hari ke-berapa dalam setahun
+    # Fitur 3: Rotasi cerdas dinamis berdasarkan hari dalam tahun + variasi indeks minggu
     day_of_year = today_wib.timetuple().tm_yday
-    return templates[day_of_year % len(templates)]
+    week_num = today_wib.isocalendar()[1]
+    index = (day_of_year + (week_num * 3)) % len(templates)
+    return templates[index]
 
-def submit_monev(token, today_str, template):
-    """Mengirim presensi dan laporan harian ke endpoint Kemnaker"""
-    print(f"[3/4] Menyiapkan pengiriman laporan otomatis untuk tanggal {today_str}...")
+def submit_monev(token, today_str, template, custom_activity=None):
+    """Mengirim presensi dan laporan harian ke endpoint Kemnaker dengan koordinat natural"""
+    print(f"[3/4] Menyiapkan pengiriman laporan otomatis untuk tanggal {today_str}...", flush=True)
 
-    # Format payload resmi yang divalidasi berhasil 100% oleh Kemnaker
+    lat, long = get_jittered_coordinates()
+    activity = custom_activity.strip() if custom_activity else template["activity"]
+
     payload = {
         "date": today_str,
         "status": "PRESENT",
-        "activity_log": template["activity"],
+        "latitude": lat,
+        "longitude": long,
+        "activity_log": activity,
         "lesson_learned": template["learning"],
         "obstacles": template["obstacles"],
         "is_reviewed": True
@@ -328,21 +369,96 @@ def submit_monev(token, today_str, template):
         return res_body
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[ERROR Kemnaker API] HTTP {e.code}: {error_body}")
+        print(f"[ERROR Kemnaker API] HTTP {e.code}: {error_body}", flush=True)
         raise Exception(f"Server Kemnaker menolak pengiriman: {error_body}") from e
+
+def kirim_pengingat_sore(chat_id=None):
+    """Fitur 6: Pengingat sore ramah jam 17:30 WIB khusus menyapa 'Mas Ade'"""
+    today_wib = datetime.now(WIB)
+    today_str = today_wib.strftime("%Y-%m-%d")
+
+    sudah_absen = False
+    try:
+        token = login_kemnaker()
+        sudah_absen, _ = periksa_absen_hari_ini(token, today_str)
+    except Exception as e:
+        print(f"[Pengingat Sore] Gagal cek status: {e}", flush=True)
+
+    if sudah_absen:
+        pesan = (
+            "👋 *Halo Mas Ade!*\n\n"
+            "Presensi monev hari ini terpantau sudah terisi dengan aman (✅ *PRESENT*).\n\n"
+            "Terima kasih atas kedisiplinannya, selamat beristirahat dan hati-hati di perjalanan pulang! 🚀"
+        )
+    else:
+        pesan = (
+            "👋 *Hai Mas Ade! Waktunya pulang kantor nih.* 🏢\n\n"
+            "⚠️ Jangan lupa untuk mengisi presensi & log kegiatan harian secara mandiri ya sebelum pukul 21:00 WIB.\n\n"
+            "💡 _Kalau nanti malam Mas Ade belum sempat mengisi atau ada keperluan lain, tenang saja! "
+            "Bot Monev ADE7 Reminder akan otomatis mem-backup pengisiannya tepat pukul 21:00 WIB._ 😉"
+        )
+
+    kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
+    return {"status": "success", "message": "Pengingat sore terkirim ke Mas Ade"}
+
+def ambil_rekap_mingguan():
+    """Fitur 8: Mengambil ringkasan riwayat presensi 7 hari terakhir untuk Mas Ade"""
+    try:
+        token = login_kemnaker()
+    except Exception as e:
+        return f"❌ Gagal login ke Kemnaker: {e}"
+
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+
+    try:
+        req = urllib.request.Request(wrap_url("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances"), headers=headers)
+        res = urllib.request.urlopen(req)
+        res_data = json.loads(res.read().decode("utf-8"))
+        attendances = res_data.get("data", [])
+    except Exception as e:
+        return f"❌ Gagal memuat riwayat presensi Kemnaker: {e}"
+
+    # Urutkan tanggal descending dan ambil 7 data terbaru
+    attendances_sorted = sorted(attendances, key=lambda x: x.get("date", ""), reverse=True)[:7]
+
+    total_hadir = sum(1 for a in attendances_sorted if a.get("status") == "PRESENT")
+    total_approved = sum(1 for a in attendances_sorted if a.get("approval_status") == "APPROVED")
+    total_submitted = sum(1 for a in attendances_sorted if a.get("approval_status") == "SUBMITTED")
+
+    lines = [
+        "📊 *REKAPITULASI MINGGUAN MONEV*",
+        "👤 *Peserta:* `Mas Ade`\n",
+        f"✅ *Total Hadir Terdata:* `{total_hadir} hari`",
+        f"📋 *Status Mentor:* `{total_approved} Disetujui (Approved)` | `{total_submitted} Menunggu (Submitted)`\n",
+        "🗓️ *Rincian 7 Hari Terakhir:*"
+    ]
+
+    for item in attendances_sorted:
+        tgl = item.get("date", "-")
+        st = item.get("status", "-")
+        app = item.get("approval_status", "-")
+        icon = "✅" if st == "PRESENT" else "⚠️"
+        lines.append(f"{icon} `{tgl}` : *{st}* ({app})")
+
+    lines.append("\n💡 _Semangat magangnya, Mas Ade! Sistem pengawasan selalu aktif menjaga kehadiranmu._")
+    return "\n".join(lines)
 
 def main():
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
     jam_str = today_wib.strftime("%H:%M:%S")
 
-    print(f"=== MONEV ADE7 REMINDER RUNNER ===")
-    print(f"Waktu Sekarang: {today_str} {jam_str} WIB")
+    print(f"=== MONEV ADE7 REMINDER RUNNER ===", flush=True)
+    print(f"Waktu Sekarang: {today_str} {jam_str} WIB", flush=True)
 
     try:
         # Kirim request ke server Kemnaker dan ambil teks 'message' aslinya
         pesan_server = test_post_kemnaker()
-        print(f"[Respon Server Kemnaker]: {pesan_server}")
+        print(f"[Respon Server Kemnaker]: {pesan_server}", flush=True)
 
         # Kirimkan hanya pesan dari server ke Telegram
         kirim_telegram(pesan_server)
@@ -350,7 +466,7 @@ def main():
 
     except Exception as e:
         pesan_error = f"Gagal: {e}"
-        print(f"[ERROR] {pesan_error}")
+        print(f"[ERROR] {pesan_error}", flush=True)
         kirim_telegram(pesan_error)
         raise e
 

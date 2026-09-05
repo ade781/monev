@@ -68,6 +68,33 @@ def main():
 
             for item in data.get("result", []):
                 offset = item["update_id"] + 1
+
+                # 1. Tangani tombol Inline Keyboard (callback_query)
+                cb = item.get("callback_query")
+                if cb:
+                    cb_id = cb.get("id")
+                    chat_id = cb.get("message", {}).get("chat", {}).get("id")
+                    sender = cb.get("from", {}).get("first_name", "User")
+                    data_val = cb.get("data", "").strip()
+
+                    try:
+                        ack_url = f"https://api.telegram.org/bot{clean_token}/answerCallbackQuery"
+                        ack_req = urllib.request.Request(
+                            ack_url,
+                            data=json.dumps({"callback_query_id": cb_id}).encode("utf-8"),
+                            headers={"Content-Type": "application/json"}
+                        )
+                        direct_opener.open(ack_req, timeout=5)
+                    except Exception:
+                        pass
+
+                    print(f"[KLIK TOMBOL] Dari {sender} (ID: {chat_id}): '{data_val}'", flush=True)
+                    reply = handle_telegram_command(chat_id, data_val)
+                    monev_bot.kirim_telegram(reply, chat_id=chat_id, reply_markup=monev_bot.MENU_KEYBOARD)
+                    print(f"[BALASAN TERKIRIM] ke chat {chat_id}\n", flush=True)
+                    continue
+
+                # 2. Tangani pesan teks biasa
                 msg = item.get("message") or item.get("edited_message")
                 if not msg:
                     continue
@@ -79,11 +106,11 @@ def main():
                 print(f"[PESAN MASUK] Dari {sender} (ID: {chat_id}): '{text}'", flush=True)
 
                 # Kirim feedback processing dulu jika command berat
-                if text.startswith(("/tes", "/cek", "/status", "/monev")):
+                if text.startswith(("/tes", "/cek", "/status", "/monev", "/rekap", "/isi")):
                     monev_bot.kirim_telegram("⏳ _Sedang memproses permintaan ke server Kemnaker, mohon tunggu sebentar..._", chat_id=chat_id)
 
                 reply = handle_telegram_command(chat_id, text)
-                monev_bot.kirim_telegram(reply, chat_id=chat_id)
+                monev_bot.kirim_telegram(reply, chat_id=chat_id, reply_markup=monev_bot.MENU_KEYBOARD)
                 print(f"[BALASAN TERKIRIM] ke chat {chat_id}\n", flush=True)
 
         except KeyboardInterrupt:
