@@ -58,7 +58,9 @@ def kirim_telegram(pesan, chat_id=None):
 
     req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
     try:
-        urllib.request.urlopen(req)
+        # Selalu gunakan koneksi direct untuk Telegram API (jangan lewat proxy)
+        direct_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        direct_opener.open(req, timeout=10)
         print(f"[Telegram] Notifikasi berhasil terkirim ke chat {target_chat}!")
         return True
     except urllib.error.HTTPError as e:
@@ -84,7 +86,6 @@ def get_opener():
         handlers.append(urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
         
     opener = urllib.request.build_opener(*handlers)
-    urllib.request.install_opener(opener)
     return opener, cj
 
 def login_kemnaker():
@@ -115,12 +116,22 @@ def login_kemnaker():
     # 1. Panggil portal naco login untuk mendapatkan redirect dan session cookie
     req_init = urllib.request.Request("https://maganghub.kemnaker.go.id/api/naco/login?redirect_url=/", headers=browser_headers)
     try:
-        res_init = opener.open(req_init)
+        res_init = opener.open(req_init, timeout=12)
         html_init = res_init.read().decode("utf-8", errors="ignore")
-    except urllib.error.HTTPError as e:
-        err_content = e.read().decode("utf-8", errors="ignore")
-        print(f"[ERROR Kemnaker SSO] HTTP {e.code}: {err_content[:200]}")
-        raise Exception(f"Server SSO Kemnaker memblokir request (HTTP {e.code}). Jika di cloud luar negeri, setel INDONESIA_PROXY.") from e
+    except Exception as e:
+        proxy_env = os.getenv("INDONESIA_PROXY")
+        # Jika proxy gagal/timeout, coba fallback ke koneksi langsung
+        if proxy_env:
+            print(f"[Proxy Fallback] Proxy {proxy_env} gagal ({e}), mencoba koneksi langsung...")
+            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj), urllib.request.ProxyHandler({}))
+            try:
+                res_init = opener.open(req_init, timeout=12)
+                html_init = res_init.read().decode("utf-8", errors="ignore")
+            except Exception as direct_err:
+                raise Exception(f"Gagal koneksi SSO Kemnaker (Proxy & Direct): {direct_err}") from direct_err
+        else:
+            raise e
+
 
     csrf_match = re.search(r'name="csrf-token"\s+content="([^"]+)"', html_init)
     csrf_token = csrf_match.group(1) if csrf_match else ""

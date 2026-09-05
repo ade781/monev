@@ -29,10 +29,13 @@ def main():
     if clean_token.lower().startswith("bot"):
         clean_token = clean_token[3:]
 
+    # Gunakan direct opener tanpa proxy untuk semua request ke Telegram
+    direct_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
     # 1. Hapus webhook lama agar polling dapat menerima update secara real-time
     try:
         del_url = f"https://api.telegram.org/bot{clean_token}/deleteWebhook"
-        urllib.request.urlopen(del_url)
+        direct_opener.open(del_url, timeout=10)
         print("[Telegram Polling] Webhook berhasil di-reset untuk polling.", flush=True)
     except Exception as e:
         print(f"[Telegram Polling] Catatan: {e}", flush=True)
@@ -40,7 +43,7 @@ def main():
     # 2. Cek identitas bot
     me_url = f"https://api.telegram.org/bot{clean_token}/getMe"
     try:
-        res = urllib.request.urlopen(me_url)
+        res = direct_opener.open(me_url, timeout=10)
         bot_info = json.loads(res.read().decode("utf-8")).get("result", {})
         bot_username = bot_info.get("username", "Bot")
         print(f"=== TELEGRAM BOT POLLING AKTIF: @{bot_username} ===", flush=True)
@@ -60,7 +63,7 @@ def main():
                 url += f"&offset={offset}"
 
             req = urllib.request.Request(url, headers={"User-Agent": "MonevTelegramBot/1.0"})
-            res = urllib.request.urlopen(req, timeout=35)
+            res = direct_opener.open(req, timeout=35)
             data = json.loads(res.read().decode("utf-8"))
 
             for item in data.get("result", []):
