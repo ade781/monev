@@ -13,9 +13,31 @@ if ROOT_DIR not in sys.path:
 
 import monev_bot
 
-# Penyimpanan in-memory
+# Penyimpanan in-memory & file fallback
 PROCESSED_UPDATES = set()
 _PENDING_ACTIVITY = {}
+
+def _set_pending(chat_id, text):
+    _PENDING_ACTIVITY[str(chat_id)] = text
+    try:
+        with open(os.path.join("/tmp", f"pending_{chat_id}.txt"), "w", encoding="utf-8") as f:
+            f.write(text)
+    except Exception:
+        pass
+
+def _get_pending(chat_id):
+    cid = str(chat_id)
+    text = _PENDING_ACTIVITY.pop(cid, None)
+    if not text:
+        p = os.path.join("/tmp", f"pending_{chat_id}.txt")
+        try:
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    text = f.read().strip()
+                os.remove(p)
+        except Exception:
+            pass
+    return text
 
 # Keyboard konfirmasi khusus /isi
 CONFIRM_ISI_KEYBOARD = {
@@ -77,13 +99,13 @@ def handle_telegram_command(chat_id, text):
 
     elif cmd in ["/monev_confirm", "ya", "/ya"]:
         try:
-            res = monev_bot.main(force=True)
+            res = monev_bot.main(force=True, notify_telegram=False)
             return (res.get("message", "Selesai dieksekusi"), monev_bot.MENU_KEYBOARD)
         except Exception as e:
             return (f"❌ *Gagal Eksekusi:* `{str(e)}`", monev_bot.MENU_KEYBOARD)
 
     elif cmd in ["/isi_confirm"]:
-        kegiatan = _PENDING_ACTIVITY.pop(str(chat_id), None)
+        kegiatan = _get_pending(chat_id)
         if not kegiatan:
             return ("⚠️ *Sesi Kedaluwarsa*\nTidak ada catatan kegiatan yang tertunda. Silakan ketik ulang `/isi <kegiatan>`.", monev_bot.MENU_KEYBOARD)
 
@@ -105,7 +127,7 @@ def handle_telegram_command(chat_id, text):
             return (f"❌ *Gagal Kirim:* `{str(e)}`", monev_bot.MENU_KEYBOARD)
 
     elif cmd in ["/monev_cancel", "tidak", "/tidak", "/batal"]:
-        _PENDING_ACTIVITY.pop(str(chat_id), None)
+        _get_pending(chat_id)
         return (
             "❌ *Aksi Dibatalkan.*\n\n"
             "Tidak ada data atau laporan presensi yang dikirim ke Kemnaker. Semuanya tetap aman terkendali! 👍",
@@ -130,7 +152,7 @@ def handle_telegram_command(chat_id, text):
         if diag.get("success") and diag.get("sudah_absen"):
             return ("monev sudah diisii", monev_bot.MENU_KEYBOARD)
 
-        _PENDING_ACTIVITY[str(chat_id)] = kegiatan
+        _set_pending(chat_id, kegiatan)
         today_wib = datetime.now(monev_bot.WIB)
         today_str = today_wib.strftime("%Y-%m-%d")
         jam_str = today_wib.strftime("%H:%M:%S")
@@ -160,6 +182,10 @@ def handle_telegram_command(chat_id, text):
             "Ketik `/help` untuk melihat daftar perintah, atau gunakan tombol di bawah.",
             monev_bot.MENU_KEYBOARD
         )
+
+def _send_reply(chat_id, res):
+    reply_text, keyboard = res if isinstance(res, tuple) else (res, monev_bot.MENU_KEYBOARD)
+    monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -206,32 +232,15 @@ class handler(BaseHTTPRequestHandler):
                         pass
 
                 if chat_id and cq_data:
-                    res = handle_telegram_command(chat_id, cq_data)
-                    if isinstance(res, tuple):
-                        reply_text, keyboard = res
-                    else:
-                        reply_text, keyboard = res, monev_bot.MENU_KEYBOARD
-                    if keyboard is not None:
-                        monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
-                    else:
-                        monev_bot.kirim_telegram(reply_text, chat_id=chat_id)
+                    _send_reply(chat_id, handle_telegram_command(chat_id, cq_data))
 
             # 2. Tangani pesan teks biasa
             message = update.get("message") or update.get("edited_message")
             if message:
                 chat_id = message.get("chat", {}).get("id")
                 text = message.get("text", "").strip()
-
                 if chat_id and text:
-                    res = handle_telegram_command(chat_id, text)
-                    if isinstance(res, tuple):
-                        reply_text, keyboard = res
-                    else:
-                        reply_text, keyboard = res, monev_bot.MENU_KEYBOARD
-                    if keyboard is not None:
-                        monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
-                    else:
-                        monev_bot.kirim_telegram(reply_text, chat_id=chat_id)
+                    _send_reply(chat_id, handle_telegram_command(chat_id, text))
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -312,7 +321,7 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             try:
-                result = monev_bot.main()
+                result = monev_bot.main(notify_telegram=True)
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()

@@ -46,5 +46,5 @@ jobs:
               monev_bot.kirim_pengingat_monev(force_mode='keras')
           else:
               print('[21:00 WIB] Mengecek dan Menjalankan Auto Monev Cadangan...')
-              monev_bot.main()
+              monev_bot.main(notify_telegram=True)
           "

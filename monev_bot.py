@@ -27,10 +27,16 @@ def load_dotenv(env_path=".env"):
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 WIB = timezone(timedelta(hours=7))
+def _safe_float(val, default):
+    try:
+        return float(val) if val is not None and str(val).strip() else default
+    except (ValueError, TypeError):
+        return default
+
 KEMNAKER_USERNAME = os.getenv("KEMNAKER_USERNAME")
 KEMNAKER_PASSWORD = os.getenv("KEMNAKER_PASSWORD")
-OFFICE_LAT = float(os.getenv("OFFICE_LAT", "-7.8981812"))
-OFFICE_LONG = float(os.getenv("OFFICE_LONG", "110.0499084"))
+OFFICE_LAT = _safe_float(os.getenv("OFFICE_LAT"), -7.8981812)
+OFFICE_LONG = _safe_float(os.getenv("OFFICE_LONG"), 110.0499084)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -72,18 +78,30 @@ def wrap_url(target_url):
 
 def api_call(endpoint, token, method="GET", payload=None):
     """Fungsi helper tunggal terstandarisasi untuk semua request ke Kemnaker API"""
+    global _CACHED_TOKEN
     headers = {
         "User-Agent": USER_AGENT,
         "Authorization": f"Bearer {token}",
         "Accept": "application/json"
     }
-    data_bytes = None
-    if payload is not None:
+    data_bytes = json.dumps(payload).encode("utf-8") if payload is not None else None
+    if data_bytes is not None:
         headers["Content-Type"] = "application/json"
-        data_bytes = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(wrap_url(endpoint), data=data_bytes, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=15) as res:
-        return json.loads(res.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=15) as res:
+            return json.loads(res.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            _CACHED_TOKEN = None
+        try:
+            err_data = json.loads(e.read().decode("utf-8"))
+            msg = err_data.get("message") or err_data.get("error") or str(e)
+            raise Exception(f"{e.code}: {msg}") from None
+        except Exception as inner_e:
+            if str(inner_e).startswith(str(e.code)):
+                raise inner_e
+            raise Exception(f"HTTP {e.code}: {e.reason}") from None
 
 def get_jittered_coordinates():
     """Memberikan deviasi mikro alami (~10-25 meter) pada koordinat GPS"""
@@ -184,13 +202,11 @@ def login_kemnaker(force_refresh=False):
 
 # 4. Pengecekan & Diagnosis Sistem
 def periksa_absen_hari_ini(token, today_str):
-    try:
-        attendances = api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances", token).get("data", [])
-        for item in attendances:
-            if item.get("date") == today_str:
-                return True, item
-    except Exception as e:
-        print(f"Gagal cek absen: {e}", flush=True)
+    attendances = api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances", token).get("data", [])
+    for item in attendances:
+        item_date = str(item.get("date", ""))
+        if item_date == today_str or item_date.startswith(today_str):
+            return True, item
     return False, None
 
 def periksa_koneksi_dan_status():
@@ -285,14 +301,20 @@ def format_status_presensi():
 # 5. Template & Eksekusi Monev
 def ambil_template(today_wib):
     global _ACTIVITY_TEMPLATES
-    if _ACTIVITY_TEMPLATES is None:
+    if not _ACTIVITY_TEMPLATES:
         p = os.path.join(os.path.dirname(__file__), "templates.json")
-        _ACTIVITY_TEMPLATES = json.load(open(p, "r", encoding="utf-8")) if os.path.exists(p) else [{
-            "activity": "Melakukan penelusuran modul fungsional aplikasi serta dokumentasi teknis pendukung.",
-            "learning": "Mempelajari alur integrasi sistem data dan prosedur validasi parameter operasional.",
-            "obstacles": "Tidak ada kendala yang berarti, seluruh tugas berjalan dengan lancar."
-        }]
-    # Rotasi sekuensial harian natural agar alur kegiatan konsisten
+        try:
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    _ACTIVITY_TEMPLATES = json.load(f)
+        except Exception:
+            pass
+        if not _ACTIVITY_TEMPLATES:
+            _ACTIVITY_TEMPLATES = [{
+                "activity": "Melakukan penelusuran modul fungsional aplikasi serta dokumentasi teknis pendukung.",
+                "learning": "Mempelajari alur integrasi sistem data dan prosedur validasi parameter operasional.",
+                "obstacles": "Tidak ada kendala yang berarti, seluruh tugas berjalan dengan lancar."
+            }]
     day = today_wib.timetuple().tm_yday
     return _ACTIVITY_TEMPLATES[day % len(_ACTIVITY_TEMPLATES)]
 
@@ -331,21 +353,24 @@ def muat_template_pengingat():
 
 def kirim_pengingat_monev(chat_id=None, force_mode=None):
     today_wib = datetime.now(WIB)
-    sudah, _ = periksa_absen_hari_ini(login_kemnaker(), today_wib.strftime("%Y-%m-%d"))
+    today_str = today_wib.strftime("%Y-%m-%d")
+    try:
+        sudah, _ = periksa_absen_hari_ini(login_kemnaker(), today_str)
+        if sudah:
+            print(f"[Pengingat] Presensi {today_str} sudah terisi. Pengingat dilewati.", flush=True)
+            return {"status": "already_submitted", "message": "Presensi hari ini sudah terisi, pengingat dilewati."}
+    except Exception as e:
+        print(f"[Pengingat] Status presensi tidak dapat dicek ({e}), tetap kirim pengingat.", flush=True)
 
-    if sudah:
-        pesan = "👋 *Halo Mas Ade!*\n\nPresensi monev hari ini terpantau sudah terisi aman (✅ *PRESENT*).\n\nLanjutkan santai atau rebahannya maszeh! 🛋️✨"
-    else:
-        temps = muat_template_pengingat()
-        is_keras = force_mode == "keras" or (force_mode is None and today_wib.hour >= 20)
-        daftar = temps.get("keras_20" if is_keras else "santai_19", [])
-        pesan = (
-            f"{random.choice(daftar)}\n\n"
-            f"_{('🔥 PENGINGAT KERAS JAM 20:00 WIB' if is_keras else '☕ PENGINGAT SANTAI JAM 19:00 WIB')}_\n"
-            "⏰ *Batas Waktu Mandiri:* Sebelum 21:00 WIB\n"
-            "💡 _Ketik `/isi <kegiatan>` atau klik tombol di bawah._"
-        )
-
+    temps = muat_template_pengingat()
+    is_keras = force_mode == "keras" or (force_mode is None and today_wib.hour >= 20)
+    daftar = temps.get("keras_20" if is_keras else "santai_19", [])
+    pesan = (
+        f"{random.choice(daftar) if daftar else 'Halo Mas Ade, jangan lupa isi monev hari ini ya!'}\n\n"
+        f"_{('🔥 PENGINGAT KERAS JAM 20:00 WIB' if is_keras else '☕ PENGINGAT SANTAI JAM 19:00 WIB')}_\n"
+        "⏰ *Batas Waktu Mandiri:* Sebelum 21:00 WIB\n"
+        "💡 _Ketik `/isi <kegiatan>` atau klik tombol di bawah._"
+    )
     kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
     return {"status": "success", "message": "Pengingat terkirim"}
 
@@ -375,7 +400,7 @@ def ambil_rekap_mingguan():
     lines.append("\n💡 _Semangat magangnya, Mas Ade! Sistem pengawasan selalu aktif menjaga kehadiranmu._")
     return "\n".join(lines)
 
-def main(force=False):
+def main(force=False, notify_telegram=False):
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
     jam_str = today_wib.strftime("%H:%M:%S")
@@ -386,7 +411,8 @@ def main(force=False):
         sudah, data_absen = periksa_absen_hari_ini(token, today_str)
         if sudah:
             msg = "monev sudah diisii"
-            kirim_telegram(msg)
+            if notify_telegram:
+                kirim_telegram(msg)
             return {"status": "already_submitted", "date": today_str, "message": msg}
 
         template = ambil_template(today_wib)
@@ -399,12 +425,14 @@ def main(force=False):
             f"💡 *Pembelajaran:*\n_{template['learning']}_\n\n"
             "Laporan presensi berhasil diserahkan ke server Kemnaker!"
         )
-        kirim_telegram(msg)
+        if notify_telegram:
+            kirim_telegram(msg)
         return {"status": "success", "date": today_str, "message": msg}
     except Exception as e:
         msg = f"❌ *Gagal Eksekusi Monev:*\n`{e}`"
-        kirim_telegram(msg)
+        if notify_telegram:
+            kirim_telegram(msg)
         raise e
 
 if __name__ == "__main__":
-    main()
+    main(notify_telegram=True)

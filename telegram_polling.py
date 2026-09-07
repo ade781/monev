@@ -29,6 +29,14 @@ def main():
     if clean_token.lower().startswith("bot"):
         clean_token = clean_token[3:]
 
+    # Cegah penghapusan webhook Vercel secara tidak sengaja
+    if "--force" not in sys.argv and "-f" not in sys.argv:
+        print("\n[PERINGATAN] Menjalankan polling lokal akan MENGHAPUS webhook Vercel!")
+        print("Bot produksi di cloud (Vercel) akan berhenti merespons selama webhook dihapus.")
+        print("Jika memang ingin testing polling lokal, jalankan dengan flag --force:")
+        print("  python telegram_polling.py --force\n")
+        return
+
     # Gunakan direct opener tanpa proxy untuk semua request ke Telegram
     direct_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -89,12 +97,8 @@ def main():
                         pass
 
                     print(f"[KLIK TOMBOL] Dari {sender} (ID: {chat_id}): '{data_val}'", flush=True)
-                    reply = handle_telegram_command(chat_id, data_val)
-                    if isinstance(reply, tuple):
-                        reply_text, keyboard = reply
-                    else:
-                        reply_text, keyboard = reply, monev_bot.MENU_KEYBOARD
-                    monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
+                    txt, kb = reply if isinstance(reply := handle_telegram_command(chat_id, data_val), tuple) else (reply, monev_bot.MENU_KEYBOARD)
+                    monev_bot.kirim_telegram(txt, chat_id=chat_id, reply_markup=kb)
                     print(f"[BALASAN TERKIRIM] ke chat {chat_id}\n", flush=True)
                     continue
 
@@ -113,12 +117,8 @@ def main():
                 if text.startswith(("/tes", "/cek", "/status", "/monev", "/rekap", "/isi")):
                     monev_bot.kirim_telegram("⏳ _Sedang memproses permintaan ke server Kemnaker, mohon tunggu sebentar..._", chat_id=chat_id)
 
-                reply = handle_telegram_command(chat_id, text)
-                if isinstance(reply, tuple):
-                    reply_text, keyboard = reply
-                else:
-                    reply_text, keyboard = reply, monev_bot.MENU_KEYBOARD
-                monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
+                txt, kb = reply if isinstance(reply := handle_telegram_command(chat_id, text), tuple) else (reply, monev_bot.MENU_KEYBOARD)
+                monev_bot.kirim_telegram(txt, chat_id=chat_id, reply_markup=kb)
                 print(f"[BALASAN TERKIRIM] ke chat {chat_id}\n", flush=True)
 
         except KeyboardInterrupt:
