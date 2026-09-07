@@ -13,8 +13,26 @@ if ROOT_DIR not in sys.path:
 
 import monev_bot
 
+# Penyimpanan in-memory
+PROCESSED_UPDATES = set()
+_PENDING_ACTIVITY = {}
+
+# Keyboard konfirmasi khusus /isi
+CONFIRM_ISI_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "✅ Ya, Kirim Sekarang", "callback_data": "/isi_confirm"},
+            {"text": "❌ Batalkan", "callback_data": "/monev_cancel"}
+        ]
+    ]
+}
+
 def handle_telegram_command(chat_id, text):
     """Memproses command Telegram dari pengguna dan mengembalikan (teks_balasan, keyboard)"""
+    owner_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if owner_chat_id and str(chat_id).strip() != owner_chat_id:
+        return ("⛔ *Akses Ditolak*\nBot ini bersifat privat dan hanya merespons Mas Ade.", None)
+
     cmd = text.split()[0].lower() if text else ""
 
     if cmd in ["/start", "/help", "/bantuan"]:
@@ -64,9 +82,32 @@ def handle_telegram_command(chat_id, text):
         except Exception as e:
             return (f"❌ *Gagal Eksekusi:* `{str(e)}`", monev_bot.MENU_KEYBOARD)
 
+    elif cmd in ["/isi_confirm"]:
+        kegiatan = _PENDING_ACTIVITY.pop(str(chat_id), None)
+        if not kegiatan:
+            return ("⚠️ *Sesi Kedaluwarsa*\nTidak ada catatan kegiatan yang tertunda. Silakan ketik ulang `/isi <kegiatan>`.", monev_bot.MENU_KEYBOARD)
+
+        diag = monev_bot.periksa_koneksi_dan_status()
+        if diag.get("success") and diag.get("sudah_absen"):
+            return ("monev sudah diisii", monev_bot.MENU_KEYBOARD)
+
+        try:
+            res = monev_bot.submit_monev(custom_activity=kegiatan)
+            msg = res.get("message") or "Laporan berhasil diserahkan ke server Kemnaker!"
+            return (
+                "📝 *PENGISIAN KEGIATAN KUSTOM BERHASIL*\n\n"
+                "👤 *Peserta:* `Mas Ade`\n"
+                f"📌 *Kegiatan:* _{kegiatan}_\n\n"
+                f"📡 *Respon Server:* `{msg}`",
+                monev_bot.MENU_KEYBOARD
+            )
+        except Exception as e:
+            return (f"❌ *Gagal Kirim:* `{str(e)}`", monev_bot.MENU_KEYBOARD)
+
     elif cmd in ["/monev_cancel", "tidak", "/tidak", "/batal"]:
+        _PENDING_ACTIVITY.pop(str(chat_id), None)
         return (
-            "❌ *Eksekusi Monev Dibatalkan.*\n\n"
+            "❌ *Aksi Dibatalkan.*\n\n"
             "Tidak ada data atau laporan presensi yang dikirim ke Kemnaker. Semuanya tetap aman terkendali! 👍",
             monev_bot.MENU_KEYBOARD
         )
@@ -84,14 +125,22 @@ def handle_telegram_command(chat_id, text):
                 "`/isi Mengerjakan integrasi REST API dan optimasi query database`",
                 monev_bot.MENU_KEYBOARD
             )
-        
-        res = monev_bot.test_post_kemnaker(custom_activity=kegiatan)
+
+        diag = monev_bot.periksa_koneksi_dan_status()
+        if diag.get("success") and diag.get("sudah_absen"):
+            return ("monev sudah diisii", monev_bot.MENU_KEYBOARD)
+
+        _PENDING_ACTIVITY[str(chat_id)] = kegiatan
+        today_wib = datetime.now(monev_bot.WIB)
+        today_str = today_wib.strftime("%Y-%m-%d")
+        jam_str = today_wib.strftime("%H:%M:%S")
+
         return (
-            "📝 *PENGISIAN KEGIATAN KUSTOM KEMNAKER*\n\n"
-            "👤 *Peserta:* `Mas Ade`\n"
-            f"📌 *Kegiatan:* _{kegiatan}_\n\n"
-            f"📡 *Respon Server:* `{res}`",
-            monev_bot.MENU_KEYBOARD
+            "⚠️ *KONFIRMASI PENGISIAN KEGIATAN KUSTOM*\n\n"
+            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+            f"📝 *Kegiatan:*\n_{kegiatan}_\n\n"
+            "Apakah Anda yakin ingin submit laporan ini ke Kemnaker sekarang?",
+            CONFIRM_ISI_KEYBOARD
         )
 
     elif cmd in ["/proxy"]:
@@ -119,6 +168,19 @@ class handler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
             update = json.loads(body.decode("utf-8")) if body else {}
+
+            # Pencegahan duplikasi request dari auto-retry Telegram
+            update_id = update.get("update_id")
+            if update_id:
+                if update_id in PROCESSED_UPDATES:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"status": "duplicate_skipped"}')
+                    return
+                PROCESSED_UPDATES.add(update_id)
+                if len(PROCESSED_UPDATES) > 100:
+                    PROCESSED_UPDATES.pop()
 
             token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
             if token.lower().startswith("bot"):
@@ -149,7 +211,10 @@ class handler(BaseHTTPRequestHandler):
                         reply_text, keyboard = res
                     else:
                         reply_text, keyboard = res, monev_bot.MENU_KEYBOARD
-                    monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
+                    if keyboard is not None:
+                        monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
+                    else:
+                        monev_bot.kirim_telegram(reply_text, chat_id=chat_id)
 
             # 2. Tangani pesan teks biasa
             message = update.get("message") or update.get("edited_message")
@@ -163,7 +228,10 @@ class handler(BaseHTTPRequestHandler):
                         reply_text, keyboard = res
                     else:
                         reply_text, keyboard = res, monev_bot.MENU_KEYBOARD
-                    monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
+                    if keyboard is not None:
+                        monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
+                    else:
+                        monev_bot.kirim_telegram(reply_text, chat_id=chat_id)
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -178,7 +246,7 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(b'{"status": "error_handled"}')
 
     def do_GET(self):
-        """Menangani Cron Vercel, registrasi Webhook, dan diagnosa via browser"""
+        """Menangani Webhook Telegram setup, diagnosa via browser, dan trigger aman"""
         parsed_url = urllib.parse.urlparse(self.path)
         query_params = urllib.parse.parse_qs(parsed_url.query)
 
@@ -207,11 +275,11 @@ class handler(BaseHTTPRequestHandler):
                 "action": "setup_webhook",
                 "webhook_url": webhook_url,
                 "telegram_response": tg_res_body,
-                "instruction": "Webhook aktif! Sekarang buka Telegram @Cekad_bot dan ketik /start"
+                "instruction": "Webhook aktif! Buka Telegram @Cekad_bot dan ketik /start"
             }, indent=2).encode("utf-8"))
             return
 
-        # 2. Fitur Pengingat (Jam 19:00 Santai & Jam 20:00 Keras)
+        # 2. Fitur Pengingat
         if "type" in query_params and query_params["type"][0] == "reminder":
             force_mode = query_params.get("mode", [None])[0]
             result = monev_bot.kirim_pengingat_monev(force_mode=force_mode)
@@ -230,35 +298,38 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(diag.encode("utf-8"))
             return
 
-        # 4. Trigger pengisian otomatis harian (Cron 21:00 WIB via ?type=auto atau ?type=cron)
+        # 4. Trigger pengisian otomatis harian (dengan verifikasi CRON_SECRET)
         if "type" in query_params and query_params["type"][0] in ["auto", "cron"]:
+            cron_secret = os.getenv("CRON_SECRET", "").strip()
+            auth_header = self.headers.get("Authorization", "")
+            provided_secret = query_params.get("secret", [""])[0]
+
+            if cron_secret and provided_secret != cron_secret and auth_header != f"Bearer {cron_secret}":
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"error": "Unauthorized: Invalid CRON_SECRET"}')
+                return
+
             try:
                 result = monev_bot.main()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                response = {
-                    "status": "success",
-                    "result": result
-                }
-                self.wfile.write(json.dumps(response).encode("utf-8"))
+                self.wfile.write(json.dumps({"status": "success", "result": result}).encode("utf-8"))
             except Exception as e:
                 self.send_response(500)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                response = {
-                    "status": "error",
-                    "message": str(e)
-                }
-                self.wfile.write(json.dumps(response).encode("utf-8"))
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
             return
 
-        # 5. Default GET (Safe: Halaman info status, tidak menjalankan eksekusi apapun)
+        # 5. Default GET (Safe: Halaman info status)
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps({
             "status": "online",
             "service": "Monev ADE7 Reminder Bot API",
-            "message": "Endpoint aktif. Kunjungi Telegram bot @Cekad_bot untuk interaksi."
+            "message": "Endpoint aktif. Silakan buka bot Telegram @Cekad_bot untuk interaksi."
         }, indent=2).encode("utf-8"))

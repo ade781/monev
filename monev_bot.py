@@ -113,6 +113,21 @@ def kirim_telegram(pesan, chat_id=None, reply_markup=None):
     try:
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=10):
             return True
+    except urllib.error.HTTPError as e:
+        if e.code == 400 and "parse_mode" in payload_dict:
+            del payload_dict["parse_mode"]
+            req_plain = urllib.request.Request(
+                f"https://api.telegram.org/bot{clean_token}/sendMessage",
+                data=json.dumps(payload_dict).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            try:
+                with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req_plain, timeout=10):
+                    return True
+            except Exception:
+                pass
+        print(f"[Telegram Error] {e}", flush=True)
+        return False
     except Exception as e:
         print(f"[Telegram Error] {e}", flush=True)
         return False
@@ -277,9 +292,9 @@ def ambil_template(today_wib):
             "learning": "Mempelajari alur integrasi sistem data dan prosedur validasi parameter operasional.",
             "obstacles": "Tidak ada kendala yang berarti, seluruh tugas berjalan dengan lancar."
         }]
+    # Rotasi sekuensial harian natural agar alur kegiatan konsisten
     day = today_wib.timetuple().tm_yday
-    week = today_wib.isocalendar()[1]
-    return _ACTIVITY_TEMPLATES[(day + (week * 3)) % len(_ACTIVITY_TEMPLATES)]
+    return _ACTIVITY_TEMPLATES[day % len(_ACTIVITY_TEMPLATES)]
 
 def submit_monev(token=None, today_str=None, template=None, custom_activity=None):
     """Fungsi tunggal untuk submit presensi (otomatis maupun kustom)"""
