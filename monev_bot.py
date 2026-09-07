@@ -370,8 +370,7 @@ def main(force=False):
         token = login_kemnaker()
         sudah, data_absen = periksa_absen_hari_ini(token, today_str)
         if sudah:
-            app_st = data_absen.get("approval_status", "SUBMITTED") if data_absen else "SUBMITTED"
-            msg = f"ℹ️ *Presensi Hari Ini Sudah Terisi!*\n\n📅 *Tanggal:* `{today_str}`\n📊 *Status:* `PRESENT` ({app_st})\n\nSistem tidak mengirim data ganda. Aman terkendali! 🛋️✨"
+            msg = "monev sudah diisii"
             kirim_telegram(msg)
             return {"status": "already_submitted", "date": today_str, "message": msg}
 

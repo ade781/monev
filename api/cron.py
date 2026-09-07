@@ -43,15 +43,7 @@ def handle_telegram_command(chat_id, text):
     elif cmd in ["/monev", "/run", "/submit"]:
         diag = monev_bot.periksa_koneksi_dan_status()
         if diag.get("success") and diag.get("sudah_absen"):
-            data_absen = diag.get("data_absen") or {}
-            app_st = data_absen.get("approval_status", "SUBMITTED")
-            return (
-                "ℹ️ *Presensi Hari Ini Sudah Terisi!*\n\n"
-                f"📅 *Tanggal:* `{diag.get('today_str')}`\n"
-                f"📊 *Status:* `PRESENT` ({app_st})\n\n"
-                "Presensi hari ini sudah aman tercatat di server Kemnaker, Mas Ade tidak perlu eksekusi lagi. Rebahan tenang! 🛋️✨",
-                monev_bot.MENU_KEYBOARD
-            )
+            return ("monev sudah diisii", monev_bot.MENU_KEYBOARD)
 
         today_wib = datetime.now(monev_bot.WIB)
         today_str = today_wib.strftime("%Y-%m-%d")
