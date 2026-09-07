@@ -55,7 +55,7 @@ def handle_telegram_command(chat_id, text):
     if owner_chat_id and str(chat_id).strip() != owner_chat_id:
         return ("⛔ *Akses Ditolak*\nBot ini bersifat privat dan hanya merespons Mas Ade.", None)
 
-    cmd = text.split()[0].lower() if text else ""
+    cmd = text.split()[0].lower().split("@")[0] if text else ""
 
     if cmd in ["/start", "/help", "/bantuan"]:
         return (
@@ -216,7 +216,7 @@ class handler(BaseHTTPRequestHandler):
             callback_query = update.get("callback_query")
             if callback_query:
                 cq_id = callback_query.get("id")
-                chat_id = callback_query.get("message", {}).get("chat", {}).get("id")
+                chat_id = callback_query.get("message", {}).get("chat", {}).get("id") or callback_query.get("from", {}).get("id")
                 cq_data = callback_query.get("data", "").strip()
 
                 if cq_id and token:

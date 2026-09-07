@@ -44,7 +44,11 @@ jobs:
           elif hour == 20:
               print('[20:00 WIB] Mengirim Pengingat Keras...')
               monev_bot.kirim_pengingat_monev(force_mode='keras')
-          else:
-              print('[21:00 WIB] Mengecek dan Menjalankan Auto Monev Cadangan...')
+          elif hour >= 21:
+              print('[21:00 WIB+] Mengecek dan Menjalankan Auto Monev Cadangan...')
               monev_bot.main(notify_telegram=True)
+          else:
+              print(f'[{now_wib.strftime(\"%H:%M\")} WIB] Manual dispatch / trigger di luar jadwal malam.')
+              print('Hanya menjalankan tes diagnostik sistem (tanpa mengirim presensi):')
+              print(monev_bot.test_koneksi_sistem())
           "

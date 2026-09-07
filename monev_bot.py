@@ -222,9 +222,12 @@ def periksa_koneksi_dan_status():
 
         activity_text = ""
         if sudah:
-            logs = api_call(f"https://monev-api.maganghub.kemnaker.go.id/api/v1/daily-logs?date={today_str}", token).get("data", [])
-            if logs:
-                activity_text = logs[0].get("activity_log", "")
+            try:
+                logs = api_call(f"https://monev-api.maganghub.kemnaker.go.id/api/v1/daily-logs?date={today_str}", token).get("data", [])
+                if logs:
+                    activity_text = logs[0].get("activity_log", "")
+            except Exception:
+                pass
 
         return {
             "success": True,
