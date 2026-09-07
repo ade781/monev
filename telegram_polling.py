@@ -90,7 +90,11 @@ def main():
 
                     print(f"[KLIK TOMBOL] Dari {sender} (ID: {chat_id}): '{data_val}'", flush=True)
                     reply = handle_telegram_command(chat_id, data_val)
-                    monev_bot.kirim_telegram(reply, chat_id=chat_id, reply_markup=monev_bot.MENU_KEYBOARD)
+                    if isinstance(reply, tuple):
+                        reply_text, keyboard = reply
+                    else:
+                        reply_text, keyboard = reply, monev_bot.MENU_KEYBOARD
+                    monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
                     print(f"[BALASAN TERKIRIM] ke chat {chat_id}\n", flush=True)
                     continue
 
@@ -110,7 +114,11 @@ def main():
                     monev_bot.kirim_telegram("⏳ _Sedang memproses permintaan ke server Kemnaker, mohon tunggu sebentar..._", chat_id=chat_id)
 
                 reply = handle_telegram_command(chat_id, text)
-                monev_bot.kirim_telegram(reply, chat_id=chat_id, reply_markup=monev_bot.MENU_KEYBOARD)
+                if isinstance(reply, tuple):
+                    reply_text, keyboard = reply
+                else:
+                    reply_text, keyboard = reply, monev_bot.MENU_KEYBOARD
+                monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
                 print(f"[BALASAN TERKIRIM] ke chat {chat_id}\n", flush=True)
 
         except KeyboardInterrupt:

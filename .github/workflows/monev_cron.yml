@@ -1,13 +1,17 @@
-name: Auto Monev Backup Scheduler
+name: Auto Monev & Reminder Scheduler
 
 on:
   schedule:
-    # Berjalan otomatis setiap Senin - Jumat jam 14:00 UTC (21:00 WIB)
-    - cron: '0 14 * * 1-5'
+    # Jam 12:00 UTC = 19:00 WIB (Pengingat Santai Setiap Hari Senin - Minggu)
+    - cron: '0 12 * * *'
+    # Jam 13:00 UTC = 20:00 WIB (Pengingat Keras Setiap Hari Senin - Minggu)
+    - cron: '0 13 * * *'
+    # Jam 14:00 UTC = 21:00 WIB (Auto Monev Cadangan Setiap Hari Senin - Minggu)
+    - cron: '0 14 * * *'
   workflow_dispatch: # Tombol 'Run workflow' manual di dashboard GitHub
 
 jobs:
-  run-monev:
+  run-monev-task:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -18,7 +22,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Run Monev Auto Bot
+      - name: Run Scheduled Monev / Reminder Task
         env:
           KEMNAKER_USERNAME: ${{ secrets.KEMNAKER_USERNAME }}
           KEMNAKER_PASSWORD: ${{ secrets.KEMNAKER_PASSWORD }}
@@ -26,4 +30,21 @@ jobs:
           OFFICE_LONG: ${{ secrets.OFFICE_LONG }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python monev_bot.py
+          CLOUDFLARE_WORKER_URL: ${{ secrets.CLOUDFLARE_WORKER_URL }}
+        run: |
+          python -c "
+          import monev_bot
+          from datetime import datetime
+          now_wib = datetime.now(monev_bot.WIB)
+          hour = now_wib.hour
+          print(f'=== Auto Scheduler Aktif: {now_wib} (Jam WIB: {hour}) ===')
+          if hour == 19:
+              print('[19:00 WIB] Mengirim Pengingat Santai...')
+              monev_bot.kirim_pengingat_monev(force_mode='santai')
+          elif hour == 20:
+              print('[20:00 WIB] Mengirim Pengingat Keras...')
+              monev_bot.kirim_pengingat_monev(force_mode='keras')
+          else:
+              print('[21:00 WIB] Mengecek dan Menjalankan Auto Monev Cadangan...')
+              monev_bot.main()
+          "

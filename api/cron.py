@@ -4,6 +4,7 @@ import urllib.parse
 import json
 import sys
 import os
+from datetime import datetime
 
 # Tambahkan direktori root agar bisa import monev_bot
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -13,7 +14,7 @@ if ROOT_DIR not in sys.path:
 import monev_bot
 
 def handle_telegram_command(chat_id, text):
-    """Memproses command Telegram dari pengguna dan mengembalikan teks balasan"""
+    """Memproses command Telegram dari pengguna dan mengembalikan (teks_balasan, keyboard)"""
     cmd = text.split()[0].lower() if text else ""
 
     if cmd in ["/start", "/help", "/bantuan"]:
@@ -21,17 +22,65 @@ def handle_telegram_command(chat_id, text):
             "👋 *Halo Mas Ade! Saya Bot Monev ADE7 Reminder.*\n\n"
             "Bot ini siap membantu monitoring dan pengisian presensi cadangan harian Anda.\n\n"
             "📌 *Perintah yang Tersedia:*\n"
-            "🔹 `/cek` - Cek riwayat & status presensi terbaru hari ini\n"
+            "🔹 `/cek` - Cek apakah presensi hari ini sudah terisi atau belum\n"
+            "🔹 `/tes` - Tes koneksi & kesehatan sistem (tanpa submit presensi)\n"
+            "🔹 `/monev` - Eksekusi pengisian monev hari ini (dengan konfirmasi Ya/Tidak)\n"
             "🔹 `/rekap` - Ringkasan performa kehadiran 7 hari terakhir\n"
             "🔹 `/isi <kegiatan>` - Isi presensi hari ini dengan catatan khusus\n"
-            "🔹 `/tes` - Tes tembak POST ke Kemnaker & tampilkan respons server\n"
-            "🔹 `/monev` - Jalankan pengisian monev cadangan otomatis\n"
             "🔹 `/proxy` - Cek status Cloudflare Reverse Proxy aktif\n\n"
-            f"🆔 *Chat ID Anda:* `{chat_id}`"
+            f"🆔 *Chat ID Anda:* `{chat_id}`",
+            monev_bot.MENU_KEYBOARD
+        )
+
+    elif cmd in ["/tes"]:
+        msg = monev_bot.test_koneksi_sistem()
+        return (msg, monev_bot.MENU_KEYBOARD)
+
+    elif cmd in ["/cek", "/status"]:
+        msg = monev_bot.format_status_presensi()
+        return (msg, monev_bot.MENU_KEYBOARD)
+
+    elif cmd in ["/monev", "/run", "/submit"]:
+        diag = monev_bot.periksa_koneksi_dan_status()
+        if diag.get("success") and diag.get("sudah_absen"):
+            data_absen = diag.get("data_absen") or {}
+            app_st = data_absen.get("approval_status", "SUBMITTED")
+            return (
+                "ℹ️ *Presensi Hari Ini Sudah Terisi!*\n\n"
+                f"📅 *Tanggal:* `{diag.get('today_str')}`\n"
+                f"📊 *Status:* `PRESENT` ({app_st})\n\n"
+                "Presensi hari ini sudah aman tercatat di server Kemnaker, Mas Ade tidak perlu eksekusi lagi. Rebahan tenang! 🛋️✨",
+                monev_bot.MENU_KEYBOARD
+            )
+
+        today_wib = datetime.now(monev_bot.WIB)
+        today_str = today_wib.strftime("%Y-%m-%d")
+        jam_str = today_wib.strftime("%H:%M:%S")
+        return (
+            "⚠️ *KONFIRMASI EKSEKUSI MONEV*\n\n"
+            "Halo Mas Ade, apakah Anda yakin ingin mengisi presensi dan laporan Monev hari ini ke server Kemnaker sekarang?\n\n"
+            f"📅 *Tanggal:* `{today_str}`\n"
+            f"⏰ *Waktu:* `{jam_str} WIB`\n\n"
+            "👇 _Silakan klik tombol di bawah untuk konfirmasi:_",
+            monev_bot.CONFIRM_KEYBOARD
+        )
+
+    elif cmd in ["/monev_confirm", "ya", "/ya"]:
+        try:
+            res = monev_bot.main(force=True)
+            return (res.get("message", "Selesai dieksekusi"), monev_bot.MENU_KEYBOARD)
+        except Exception as e:
+            return (f"❌ *Gagal Eksekusi:* `{str(e)}`", monev_bot.MENU_KEYBOARD)
+
+    elif cmd in ["/monev_cancel", "tidak", "/tidak", "/batal"]:
+        return (
+            "❌ *Eksekusi Monev Dibatalkan.*\n\n"
+            "Tidak ada data atau laporan presensi yang dikirim ke Kemnaker. Semuanya tetap aman terkendali! 👍",
+            monev_bot.MENU_KEYBOARD
         )
 
     elif cmd in ["/rekap"]:
-        return monev_bot.ambil_rekap_mingguan()
+        return (monev_bot.ambil_rekap_mingguan(), monev_bot.MENU_KEYBOARD)
 
     elif cmd in ["/isi"]:
         kegiatan = text[len(cmd):].strip()
@@ -40,7 +89,8 @@ def handle_telegram_command(chat_id, text):
                 "⚠️ *Format Pengisian Kegiatan Kustom:*\n"
                 "Ketik `/isi <kegiatan Anda>`\n\n"
                 "Contoh:\n"
-                "`/isi Mengerjakan integrasi REST API dan optimasi query database`"
+                "`/isi Mengerjakan integrasi REST API dan optimasi query database`",
+                monev_bot.MENU_KEYBOARD
             )
         
         res = monev_bot.test_post_kemnaker(custom_activity=kegiatan)
@@ -48,60 +98,26 @@ def handle_telegram_command(chat_id, text):
             "📝 *PENGISIAN KEGIATAN KUSTOM KEMNAKER*\n\n"
             "👤 *Peserta:* `Mas Ade`\n"
             f"📌 *Kegiatan:* _{kegiatan}_\n\n"
-            f"📡 *Respon Server:* `{res}`"
+            f"📡 *Respon Server:* `{res}`",
+            monev_bot.MENU_KEYBOARD
         )
-
-    elif cmd in ["/tes"]:
-        msg = monev_bot.test_post_kemnaker()
-        return msg
-
-    elif cmd in ["/cek", "/status"]:
-        diag = monev_bot.periksa_koneksi_dan_status()
-        if diag.get("success"):
-            sudah = diag.get("sudah_absen")
-            status_absen = "✅ *SUDAH TERISI (PRESENT)*" if sudah else "⚠️ *BELUM TERISI*"
-            ket = "Mas Ade sudah mengisi presensi hari ini secara aman." if sudah else "Belum ada presensi untuk hari ini. Bot akan backup otomatis pukul 21:00 WIB."
-            
-            return (
-                "🔍 *HASIL MONITORING KEMNAKER*\n\n"
-                f"👤 *Nama Peserta:* `{diag.get('user_name')}`\n"
-                f"🏢 *Nama Mentor:* `{diag.get('mentor_name')}`\n"
-                f"📅 *Tanggal:* `{diag.get('today_str')}`\n"
-                f"⏰ *Waktu Server:* `{diag.get('waktu')}`\n\n"
-                f"📊 *Status Presensi Hari Ini:* {status_absen}\n"
-                f"📝 _{ket}_"
-            )
-        else:
-            err = diag.get("error", "Koneksi gagal")
-            return (
-                "⚠️ *HASIL MONITORING KEMNAKER*\n\n"
-                f"⏰ *Waktu:* `{diag.get('waktu')}`\n"
-                f"❌ *Status:* Gagal terhubung ke Kemnaker\n"
-                f"🚨 *Pesan:* `{err}`\n\n"
-                "💡 *Solusi:* Pastikan variabel `CLOUDFLARE_WORKER_URL` sudah dipasang di Environment Variables Vercel."
-            )
-
-    elif cmd in ["/monev", "/run", "/submit"]:
-        try:
-            res = monev_bot.main()
-            return res.get("message", "Selesai dieksekusi")
-        except Exception as e:
-            return f"❌ *Gagal:* `{str(e)}`"
 
     elif cmd in ["/proxy"]:
         cf_proxy = os.getenv("CLOUDFLARE_WORKER_URL")
         if cf_proxy:
-            return f"🌐 *Status Cloudflare Reverse Proxy:*\n✅ Aktif: `{cf_proxy}`"
+            return (f"🌐 *Status Cloudflare Reverse Proxy:*\n✅ Aktif: `{cf_proxy}`", monev_bot.MENU_KEYBOARD)
         else:
             return (
                 "🌐 *Status Cloudflare Reverse Proxy:*\n"
-                "⚠️ Belum disetel. Tambahkan variabel `CLOUDFLARE_WORKER_URL` di Vercel Settings -> Environment Variables."
+                "⚠️ Belum disetel. Tambahkan variabel `CLOUDFLARE_WORKER_URL` di Vercel Settings -> Environment Variables.",
+                monev_bot.MENU_KEYBOARD
             )
 
     else:
         return (
             f"❓ Perintah `{text}` tidak dikenal.\n"
-            "Ketik `/help` untuk melihat daftar perintah, atau gunakan tombol di bawah."
+            "Ketik `/help` untuk melihat daftar perintah, atau gunakan tombol di bawah.",
+            monev_bot.MENU_KEYBOARD
         )
 
 class handler(BaseHTTPRequestHandler):
@@ -136,8 +152,12 @@ class handler(BaseHTTPRequestHandler):
                         pass
 
                 if chat_id and cq_data:
-                    reply_text = handle_telegram_command(chat_id, cq_data)
-                    monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=monev_bot.MENU_KEYBOARD)
+                    res = handle_telegram_command(chat_id, cq_data)
+                    if isinstance(res, tuple):
+                        reply_text, keyboard = res
+                    else:
+                        reply_text, keyboard = res, monev_bot.MENU_KEYBOARD
+                    monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
 
             # 2. Tangani pesan teks biasa
             message = update.get("message") or update.get("edited_message")
@@ -146,8 +166,12 @@ class handler(BaseHTTPRequestHandler):
                 text = message.get("text", "").strip()
 
                 if chat_id and text:
-                    reply_text = handle_telegram_command(chat_id, text)
-                    monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=monev_bot.MENU_KEYBOARD)
+                    res = handle_telegram_command(chat_id, text)
+                    if isinstance(res, tuple):
+                        reply_text, keyboard = res
+                    else:
+                        reply_text, keyboard = res, monev_bot.MENU_KEYBOARD
+                    monev_bot.kirim_telegram(reply_text, chat_id=chat_id, reply_markup=keyboard)
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -205,32 +229,44 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(result).encode("utf-8"))
             return
 
-        # 3. Fitur Tes Diagnostik via GET
+        # 3. Fitur Tes Diagnostik via GET (?test=1)
         if "test" in query_params:
-            diag = monev_bot.periksa_koneksi_dan_status()
+            diag = monev_bot.test_koneksi_sistem()
             self.send_response(200)
-            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
-            self.wfile.write(json.dumps(diag, indent=2).encode("utf-8"))
+            self.wfile.write(diag.encode("utf-8"))
             return
 
-        # 4. Default: Trigger pengisian otomatis harian (Cron 21:00 WIB)
-        try:
-            result = monev_bot.main()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            response = {
-                "status": "success",
-                "result": result
-            }
-            self.wfile.write(json.dumps(response).encode("utf-8"))
-        except Exception as e:
-            self.send_response(500)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            response = {
-                "status": "error",
-                "message": str(e)
-            }
-            self.wfile.write(json.dumps(response).encode("utf-8"))
+        # 4. Trigger pengisian otomatis harian (Cron 21:00 WIB via ?type=auto atau ?type=cron)
+        if "type" in query_params and query_params["type"][0] in ["auto", "cron"]:
+            try:
+                result = monev_bot.main()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                response = {
+                    "status": "success",
+                    "result": result
+                }
+                self.wfile.write(json.dumps(response).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                response = {
+                    "status": "error",
+                    "message": str(e)
+                }
+                self.wfile.write(json.dumps(response).encode("utf-8"))
+            return
+
+        # 5. Default GET (Safe: Halaman info status, tidak menjalankan eksekusi apapun)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps({
+            "status": "online",
+            "service": "Monev ADE7 Reminder Bot API",
+            "message": "Endpoint aktif. Kunjungi Telegram bot @Cekad_bot untuk interaksi."
+        }, indent=2).encode("utf-8"))

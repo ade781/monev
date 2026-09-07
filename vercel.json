@@ -6,7 +6,7 @@
       "schedule": "0 12,13 * * *"
     },
     {
-      "path": "/api/cron",
+      "path": "/api/cron?type=auto",
       "schedule": "0 14 * * *"
     }
   ]

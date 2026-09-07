@@ -8,15 +8,15 @@ Sistem monitoring, pengingat, dan pengisian presensi cerdas otomatis untuk Magan
 
 1. **Auto SSO Kemnaker**: Mengambil Bearer Token secara otomatis menggunakan kredensial SIAPkerja.
 2. **Pengecekan Aman (Guard Check)**: Jika sudah presensi mandiri, bot tidak akan menimpa data yang ada.
-3. **Pengingat Sore Ramah (17:30 WIB)**: Menyapa *"Mas Ade"* setiap sore jam pulang kerja di hari kerja (Senin–Jumat) sebagai early reminder sebelum backup malam.
-4. **Eksekusi Otomatis Harian (21:00 WIB)**: Berjalan otomatis setiap malam sebagai jaring pengaman jika lupa mengisi.
-5. **Human Jitter**: Jeda acak manusiawi (1.5–3.5 detik) sebelum eksekusi agar tidak terdeteksi bot otomatisasi.
-6. **Micro GPS Jitter**: Variasi koordinat mikro natural (radius 10–25 meter) sehingga posisi GPS terlihat otentik seperti HP asli.
-7. **15 Variasi Template Cerdas**: Template logbook profesional (Frontend, Backend, Database, QA, Dokumentasi) yang berotasi otomatis setiap minggu.
-8. **Tombol Interaktif (Inline Keyboard)**: Menu tombol di Telegram yang dapat diklik langsung tanpa perlu mengetik manual.
-9. **Kirim Kegiatan Kustom (`/isi <kegiatan>`)**: Kemampuan mengisi logbook kegiatan harian kustom langsung dari chat Telegram.
-10. **Rekapitulasi Mingguan (`/rekap`)**: Ringkasan performa kehadiran 7 hari terakhir beserta status approval mentor.
-11. **Cloudflare Worker Reverse Proxy**: Mem-bypass proteksi Cloudflare WAF (Error 403) saat dijalankan di cloud Vercel.
+3. **Pengingat Santai (19:00 WIB) & Keras (20:00 WIB)**: Pengingat Telegram bervariasi setiap hari (Senin–Minggu).
+4. **Auto Monev Cadangan (21:00 WIB)**: Jaring pengaman otomatis di jam 9 malam jika belum mengisi.
+5. **Human Jitter & GPS Jitter**: Jeda acak manusiawi dan deviasi koordinat natural (10–25m).
+6. **15 Variasi Template Cerdas**: Template logbook profesional berotasi otomatis setiap minggu.
+7. **Tombol Interaktif (Inline Keyboard)**: Menu tombol di Telegram yang dapat diklik langsung.
+8. **Konfirmasi Eksekusi (`/monev`)**: Dialog konfirmasi Ya/Tidak sebelum melakukan submit.
+9. **Kirim Kegiatan Kustom (`/isi <kegiatan>`)**: Mengisi logbook kegiatan harian kustom dari chat Telegram.
+10. **Rekapitulasi Mingguan (`/rekap`)**: Ringkasan performa kehadiran 7 hari terakhir beserta status mentor.
+11. **Cloudflare Worker Reverse Proxy**: Mem-bypass proteksi Cloudflare WAF saat dijalankan di Vercel.
 
 ---
 
@@ -25,12 +25,12 @@ Sistem monitoring, pengingat, dan pengisian presensi cerdas otomatis untuk Magan
 | Perintah | Fungsi |
 | :--- | :--- |
 | `/start` atau `/help` | Menampilkan menu utama dan tombol interaktif |
-| `/cek` | Memeriksa status presensi hari ini dan nama mentor |
+| `/cek` | Memeriksa apakah presensi hari ini sudah terisi atau belum (Read-only) |
+| `/tes` | Menguji kesehatan sistem, SSO, dan koneksi tanpa submit presensi |
+| `/monev` | Eksekusi pengisian monev dengan konfirmasi Ya/Tidak |
+| `/isi <kegiatan>` | Mengisi presensi hari ini dengan catatan kegiatan khusus |
 | `/rekap` | Menampilkan ringkasan kehadiran 7 hari terakhir |
-| `/isi <kegiatan>` | Mengisi presensi hari ini dengan catatan khusus |
-| `/tes` | Tes request POST ke Kemnaker & melihat pesan asli server |
-| `/monev` | Menjalankan pencadangan monev secara manual |
-| `/proxy` | Menampilkan URL Cloudflare Worker yang sedang aktif |
+| `/proxy` | Menampilkan status Cloudflare Worker reverse proxy |
 
 ---
 
