@@ -16,22 +16,32 @@ from datetime import datetime, timezone, timedelta
 
 # 1. Konfigurasi Lingkungan
 def load_dotenv(env_path=".env"):
+    if not os.path.isabs(env_path):
+        base_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+        env_path = os.path.join(base_dir, env_path)
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+                    k = k.strip()
+                    v = v.strip().strip("'\"")
+                    os.environ.setdefault(k, v)
 
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+# Muat variabel environment dari .env jika ada
+load_dotenv(".env")
 
 WIB = timezone(timedelta(hours=7))
+
+
 def _safe_float(val, default):
     try:
         return float(val) if val is not None and str(val).strip() else default
     except (ValueError, TypeError):
         return default
+
 
 KEMNAKER_USERNAME = os.getenv("KEMNAKER_USERNAME")
 KEMNAKER_PASSWORD = os.getenv("KEMNAKER_PASSWORD")
@@ -50,6 +60,9 @@ MENU_KEYBOARD = {
         [
             {"text": "⚡ Eksekusi Monev", "callback_data": "/monev"},
             {"text": "📊 Rekap Minggu Ini", "callback_data": "/rekap"}
+        ],
+        [
+            {"text": "📦 Sisa Template", "callback_data": "/sisa"}
         ]
     ]
 }
@@ -275,6 +288,9 @@ def format_status_presensi():
     if not diag.get("success"):
         return f"🔍 *STATUS PRESENSI HARI INI*\n\n⏰ *Waktu:* `{diag['waktu']}`\n❌ *Status:* Gagal terhubung ke Kemnaker\n🚨 *Pesan:* `{diag['error']}`"
 
+    sisa, total = hitung_sisa_template()
+    sisa_info = f"📦 *Template Cadangan:* `{sisa} dari {total} template belum terpakai`\n\n"
+
     if diag["sudah_absen"]:
         dt = diag.get("data_absen") or {}
         app_st = dt.get("approval_status", "SUBMITTED")
@@ -289,6 +305,7 @@ def format_status_presensi():
             f"📊 *Status:* ✅ *SUDAH TERISI (PRESENT)*{jam}\n"
             f"📋 *Persetujuan Mentor:* `{app_st}`\n\n"
             f"{act}"
+            f"{sisa_info}"
             "✨ _Presensi hari ini sudah aman tercatat. Tidak perlu diisi ulang!_"
         )
     return (
@@ -298,35 +315,162 @@ def format_status_presensi():
         f"📅 *Tanggal:* `{diag['today_str']}`\n"
         f"⏰ *Waktu Cek:* `{diag['waktu']}`\n\n"
         "📊 *Status Presensi:* ⚠️ *BELUM TERISI*\n\n"
+        f"{sisa_info}"
         "💡 _Belum ada presensi untuk hari ini. Mas Ade bisa mengisi manual di web, ketik `/isi <kegiatan>`, atau jalankan `/monev`._"
     )
 
 # 5. Template & Eksekusi Monev
-def ambil_template(today_wib):
+def muat_semua_template():
     global _ACTIVITY_TEMPLATES
-    if not _ACTIVITY_TEMPLATES:
+    if _ACTIVITY_TEMPLATES is None:
         p = os.path.join(os.path.dirname(__file__), "templates.json")
         try:
             if os.path.exists(p):
                 with open(p, "r", encoding="utf-8") as f:
                     _ACTIVITY_TEMPLATES = json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Template Error] Gagal membaca templates.json: {e}", flush=True)
         if not _ACTIVITY_TEMPLATES:
             _ACTIVITY_TEMPLATES = [{
+                "id": 1,
+                "category": "default",
                 "activity": "Melakukan penelusuran modul fungsional aplikasi serta dokumentasi teknis pendukung.",
                 "learning": "Mempelajari alur integrasi sistem data dan prosedur validasi parameter operasional.",
                 "obstacles": "Tidak ada kendala yang berarti, seluruh tugas berjalan dengan lancar."
             }]
-    day = today_wib.timetuple().tm_yday
-    return _ACTIVITY_TEMPLATES[day % len(_ACTIVITY_TEMPLATES)]
+    return _ACTIVITY_TEMPLATES
+
+def ambil_riwayat_terpakai(token=None):
+    """Mengambil riwayat template yang sudah dipakai dari used_templates.json
+    serta verifikasi silang langsung dengan riwayat daily-logs di Kemnaker."""
+    used_ids = set()
+    used_snippets = set()
+
+    # 1. Baca dari used_templates.json
+    p = os.path.join(os.path.dirname(__file__), "used_templates.json")
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                for i in data.get("used_ids", []):
+                    used_ids.add(i)
+                for h in data.get("history", []):
+                    act = str(h.get("activity", "")).strip().lower()
+                    if act:
+                        used_snippets.add(act[:40])
+        except Exception as e:
+            print(f"[Template Warning] Gagal memuat used_templates.json: {e}", flush=True)
+
+    # 2. Verifikasi silang dengan riwayat daily-logs dari Kemnaker
+    if token:
+        try:
+            logs = api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/daily-logs", token).get("data", [])
+            for item in logs:
+                act = str(item.get("activity_log", "")).strip().lower()
+                if act:
+                    used_snippets.add(act[:40])
+        except Exception as e:
+            print(f"[Template Warning] Gagal sinkronisasi daily-logs Kemnaker: {e}", flush=True)
+
+    return used_ids, used_snippets
+
+def ambil_template_belum_terpakai(today_wib=None, token=None):
+    """
+    Mengambil template kegiatan yang BELUM PERNAH DIPAKAI sama sekali.
+    Mengembalikan tuple: (template_terpilih, sisa_belum_terpakai, total_template)
+    """
+    templates = muat_semua_template()
+    total = len(templates)
+    used_ids, used_snippets = ambil_riwayat_terpakai(token=token)
+
+    # Filter template yang belum pernah dipakai
+    belum_terpakai = []
+    for t in templates:
+        t_id = t.get("id")
+        t_act_snippet = str(t.get("activity", "")).strip().lower()[:40]
+        if (t_id is not None and t_id in used_ids) or (t_act_snippet in used_snippets):
+            continue
+        belum_terpakai.append(t)
+
+    sisa = len(belum_terpakai)
+
+    if belum_terpakai:
+        terpilih = belum_terpakai[0]
+        return terpilih, sisa, total
+    else:
+        # Jika seluruh template sudah terpakai
+        today_wib = today_wib or datetime.now(WIB)
+        day = today_wib.timetuple().tm_yday
+        fallback = templates[day % total] if total > 0 else {
+            "id": 0,
+            "category": "fallback",
+            "activity": "Melakukan penelusuran modul fungsional aplikasi serta dokumentasi teknis pendukung.",
+            "learning": "Mempelajari alur integrasi sistem data dan prosedur validasi parameter operasional.",
+            "obstacles": "Tidak ada kendala yang berarti, seluruh tugas berjalan dengan lancar."
+        }
+        return fallback, 0, total
+
+def hitung_sisa_template(token=None):
+    """Menghitung sisa template yang belum terpakai dan total template yang ada."""
+    _, sisa, total = ambil_template_belum_terpakai(token=token)
+    return sisa, total
+
+def tandai_template_terpakai(template, date_str):
+    """Mencatat template yang telah dipakai ke file used_templates.json agar tidak dipakai lagi."""
+    if not template or not isinstance(template, dict):
+        return
+    t_id = template.get("id")
+    p = os.path.join(os.path.dirname(__file__), "used_templates.json")
+    data = {"used_ids": [], "history": []}
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = {"used_ids": [], "history": []}
+
+    used_ids = set(data.get("used_ids", []))
+    if t_id is not None:
+        used_ids.add(t_id)
+    data["used_ids"] = sorted(list(used_ids))
+
+    history = data.get("history", [])
+    now_iso = datetime.now(WIB).isoformat()
+    history.append({
+        "date": date_str,
+        "template_id": t_id,
+        "category": template.get("category", "general"),
+        "activity": template.get("activity", "")[:120],
+        "timestamp": now_iso
+    })
+    data["history"] = history
+
+    try:
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[Template Error] Gagal mencatat template terpakai: {e}", flush=True)
+
+def ambil_template(today_wib, token=None):
+    """Fungsi pembungkus kompatibilitas yang mengembalikan 1 template belum terpakai."""
+    template, _, _ = ambil_template_belum_terpakai(today_wib=today_wib, token=token)
+    return template
 
 def submit_monev(token=None, today_str=None, template=None, custom_activity=None):
     """Fungsi tunggal untuk submit presensi (otomatis maupun kustom)"""
     today_wib = datetime.now(WIB)
     today_str = today_str or today_wib.strftime("%Y-%m-%d")
     token = token or login_kemnaker()
-    template = template or ambil_template(today_wib)
+    
+    if not template and not custom_activity:
+        template, _, _ = ambil_template_belum_terpakai(today_wib, token=token)
+    elif not template:
+        template = {
+            "activity": custom_activity,
+            "learning": "Mempelajari dan menyelesaikan tugas operasional harian sesuai arahan di unit kerja.",
+            "obstacles": "Semua kegiatan berjalan dengan lancar dan tidak ada kendala yang berarti."
+        }
+
     lat, long = get_jittered_coordinates()
 
     payload = {
@@ -339,7 +483,13 @@ def submit_monev(token=None, today_str=None, template=None, custom_activity=None
         "obstacles": template["obstacles"],
         "is_reviewed": True
     }
-    return api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances/with-daily-log", token, method="POST", payload=payload)
+    res = api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances/with-daily-log", token, method="POST", payload=payload)
+
+    # Tandai template sebagai terpakai jika sukses dan bukan custom activity
+    if not custom_activity and template and template.get("id"):
+        tandai_template_terpakai(template, today_str)
+
+    return res
 
 # Alias backward-compatibility
 test_post_kemnaker = submit_monev
@@ -418,19 +568,35 @@ def main(force=False, notify_telegram=False):
                 kirim_telegram(msg)
             return {"status": "already_submitted", "date": today_str, "message": msg}
 
-        template = ambil_template(today_wib)
+        # Ambil template yang belum pernah dipakai sama sekali
+        template, sisa_sebelum, total = ambil_template_belum_terpakai(today_wib, token=token)
         hasil = submit_monev(token=token, today_str=today_str, template=template)
+
+        # Hitung sisa template setelah berhasil terpakai
+        sisa_sekarang = max(0, sisa_sebelum - 1) if sisa_sebelum > 0 else 0
+
+        # Peringatan jika stok template mulai menipis
+        warning_sisa = ""
+        if sisa_sekarang == 0:
+            warning_sisa = "\n\n⚠️ *PERHATIAN:* Semua template telah terpakai! Mohon segera tambahkan variasi baru ke `templates.json` agar tidak terjadi pengulangan."
+        elif sisa_sekarang <= 5:
+            warning_sisa = f"\n\n⚠️ *Pengingat:* Stok template hampir habis (tersisa {sisa_sekarang}). Disarankan menambah template baru ke `templates.json`."
+
         msg = (
-            f"🚀 *MONEV BERHASIL DIKIRIM!*\n\n"
+            f"🚀 *AUTO MONEV BERHASIL DIKIRIM (JAM 21:00 WIB)*\n\n"
             f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
             f"📍 *Lokasi:* `{OFFICE_LAT}, {OFFICE_LONG}`\n\n"
             f"📝 *Kegiatan:*\n_{template['activity']}_\n\n"
             f"💡 *Pembelajaran:*\n_{template['learning']}_\n\n"
-            "Laporan presensi berhasil diserahkan ke server Kemnaker!"
+            f"⚠️ *Kendala:*\n_{template['obstacles']}_\n\n"
+            f"📊 *Status Template:*\n"
+            f"📦 Sisa template belum terpakai: *{sisa_sekarang} dari {total} template*"
+            f"{warning_sisa}\n\n"
+            "✨ _Laporan presensi dan logbook harian berhasil diserahkan ke Kemnaker!_"
         )
         if notify_telegram:
             kirim_telegram(msg)
-        return {"status": "success", "date": today_str, "message": msg}
+        return {"status": "success", "date": today_str, "message": msg, "sisa_template": sisa_sekarang, "total_template": total}
     except Exception as e:
         msg = f"❌ *Gagal Eksekusi Monev:*\n`{e}`"
         if notify_telegram:

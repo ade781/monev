@@ -11,12 +11,13 @@ Sistem monitoring, pengingat, dan pengisian presensi cerdas otomatis untuk Magan
 3. **Pengingat Santai (19:00 WIB) & Keras (20:00 WIB)**: Pengingat Telegram bervariasi setiap hari (Senin–Minggu).
 4. **Auto Monev Cadangan (21:00 WIB)**: Jaring pengaman otomatis di jam 9 malam jika belum mengisi.
 5. **Human Jitter & GPS Jitter**: Jeda acak manusiawi dan deviasi koordinat natural (10–25m).
-6. **15 Variasi Template Cerdas**: Template logbook profesional berotasi otomatis setiap minggu.
-7. **Tombol Interaktif (Inline Keyboard)**: Menu tombol di Telegram yang dapat diklik langsung.
-8. **Konfirmasi Eksekusi (`/monev`)**: Dialog konfirmasi Ya/Tidak sebelum melakukan submit.
-9. **Kirim Kegiatan Kustom (`/isi <kegiatan>`)**: Mengisi logbook kegiatan harian kustom dari chat Telegram.
-10. **Rekapitulasi Mingguan (`/rekap`)**: Ringkasan performa kehadiran 7 hari terakhir beserta status mentor.
-11. **Cloudflare Worker Reverse Proxy**: Mem-bypass proteksi Cloudflare WAF saat dijalankan di Vercel.
+6. **35 Variasi Template Autentik (Anti-Duplikasi)**: Template kegiatan magang nyata (ARFF YIA Angkasa Pura, React, Express, QR Code, inspeksi APAR, koordinasi). Sistem menjamin setiap template yang sudah dipakai **tidak akan dipakai lagi**.
+7. **Laporan Sisa Template Otomatis**: Saat auto-monev jam 21:00 WIB berjalan, notifikasi menyertakan informasi sisa template yang belum terpakai dan peringatan jika stok menipis.
+8. **Tombol Interaktif (Inline Keyboard)**: Menu tombol di Telegram yang dapat diklik langsung (termasuk tombol cek Sisa Template).
+9. **Konfirmasi Eksekusi (`/monev`)**: Dialog konfirmasi Ya/Tidak sebelum melakukan submit.
+10. **Kirim Kegiatan Kustom (`/isi <kegiatan>`)**: Mengisi logbook kegiatan harian kustom dari chat Telegram.
+11. **Rekapitulasi Mingguan (`/rekap`)**: Ringkasan performa kehadiran 7 hari terakhir beserta status mentor.
+12. **Cloudflare Worker Reverse Proxy**: Mem-bypass proteksi Cloudflare WAF saat dijalankan di Vercel.
 
 ---
 
@@ -27,6 +28,7 @@ Sistem monitoring, pengingat, dan pengisian presensi cerdas otomatis untuk Magan
 | `/start` atau `/help` | Menampilkan menu utama dan tombol interaktif |
 | `/cek` | Memeriksa apakah presensi hari ini sudah terisi atau belum (Read-only) |
 | `/tes` | Menguji kesehatan sistem, SSO, dan koneksi tanpa submit presensi |
+| `/sisa` atau `/template` | Mengecek sisa stok template kegiatan yang belum pernah dipakai |
 | `/monev` | Eksekusi pengisian monev dengan konfirmasi Ya/Tidak |
 | `/isi <kegiatan>` | Mengisi presensi hari ini dengan catatan kegiatan khusus |
 | `/rekap` | Menampilkan ringkasan kehadiran 7 hari terakhir |

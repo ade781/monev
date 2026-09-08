@@ -67,6 +67,7 @@ def handle_telegram_command(chat_id, text):
             "🔹 `/monev` - Eksekusi pengisian monev hari ini (dengan konfirmasi Ya/Tidak)\n"
             "🔹 `/rekap` - Ringkasan performa kehadiran 7 hari terakhir\n"
             "🔹 `/isi <kegiatan>` - Isi presensi hari ini dengan catatan khusus\n"
+            "🔹 `/sisa` - Cek sisa stok template yang belum pernah terpakai\n"
             "🔹 `/proxy` - Cek status Cloudflare Reverse Proxy aktif\n\n"
             f"🆔 *Chat ID Anda:* `{chat_id}`",
             monev_bot.MENU_KEYBOARD
@@ -175,6 +176,25 @@ def handle_telegram_command(chat_id, text):
                 "⚠️ Belum disetel. Tambahkan variabel `CLOUDFLARE_WORKER_URL` di Vercel Settings -> Environment Variables.",
                 monev_bot.MENU_KEYBOARD
             )
+
+    elif cmd in ["/sisa", "/template", "/templates"]:
+        sisa, total = monev_bot.hitung_sisa_template()
+        terpakai = total - sisa
+        warning_info = ""
+        if sisa == 0:
+            warning_info = "\n\n⚠️ *Perhatian:* Semua template telah terpakai! Mohon tambahkan template baru ke `templates.json`."
+        elif sisa <= 5:
+            warning_info = f"\n\n⚠️ *Pengingat:* Sisa template tersisa sedikit ({sisa}). Disarankan menambah template baru."
+
+        return (
+            "📦 *STATUS STOK TEMPLATE KEGIATAN MONEV*\n\n"
+            f"📊 *Total Koleksi:* `{total} template`\n"
+            f"✅ *Sudah Pernah Terpakai:* `{terpakai} template`\n"
+            f"⏳ *Sisa Belum Terpakai:* *{sisa} template*\n\n"
+            "✨ _Setiap template dijamin tidak akan pernah dipakai berulang kali. Saat auto-monev jam 21:00 berjalan, sistem akan memilih template berikutnya secara berurutan._"
+            f"{warning_info}",
+            monev_bot.MENU_KEYBOARD
+        )
 
     else:
         return (

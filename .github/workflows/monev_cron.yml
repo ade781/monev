@@ -1,14 +1,12 @@
 name: Auto Monev & Reminder Scheduler
 
 on:
-  schedule:
-    # Jam 12:00 UTC = 19:00 WIB (Pengingat Santai Setiap Hari Senin - Minggu)
-    - cron: '0 12 * * *'
-    # Jam 13:00 UTC = 20:00 WIB (Pengingat Keras Setiap Hari Senin - Minggu)
-    - cron: '0 13 * * *'
-    # Jam 14:00 UTC = 21:00 WIB (Auto Monev Cadangan Setiap Hari Senin - Minggu)
-    - cron: '0 14 * * *'
-  workflow_dispatch: # Tombol 'Run workflow' manual di dashboard GitHub
+  # Penjadwalan otomatis utama telah dialihkan ke Vercel Cron (vercel.json) agar presisi dan tidak tertunda antrean GitHub.
+  # schedule:
+  #   - cron: '0 12 * * *'
+  #   - cron: '0 13 * * *'
+  #   - cron: '0 14 * * *'
+  workflow_dispatch: # Tombol 'Run workflow' manual di dashboard GitHub (tetap aktif sebagai backup darurat)
 
 jobs:
   run-monev-task:
