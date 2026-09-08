@@ -84,7 +84,10 @@ def handle_telegram_command(chat_id, text):
     elif cmd in ["/monev", "/run", "/submit"]:
         diag = monev_bot.periksa_koneksi_dan_status()
         if diag.get("success") and diag.get("sudah_absen"):
-            return ("monev sudah diisii", monev_bot.MENU_KEYBOARD)
+            dt = diag.get("data_absen") or {}
+            jam = f" (Tercatat jam {dt['created_at'].split('T')[1][:8]} WIB)" if "T" in dt.get("created_at", "") else ""
+            act = f"\n\n📝 *Kegiatan Terdata:*\n_{diag['activity_text']}_" if diag.get("activity_text") else ""
+            return (f"✅ *Presensi Monev Hari Ini Sudah Terisi!*{jam}\nAnda sudah tercatat hadir (PRESENT). Tidak perlu mengisi ulang.{act}", monev_bot.MENU_KEYBOARD)
 
         today_wib = datetime.now(monev_bot.WIB)
         today_str = today_wib.strftime("%Y-%m-%d")

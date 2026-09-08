@@ -102,7 +102,7 @@ def api_call(endpoint, token, method="GET", payload=None):
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(wrap_url(endpoint), data=data_bytes, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=15) as res:
+        with urllib.request.urlopen(req, timeout=25) as res:
             return json.loads(res.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         if e.code == 401:
@@ -184,7 +184,7 @@ def login_kemnaker(force_refresh=False):
 
     # Inisiasi SSO
     req_init = urllib.request.Request(wrap_url("https://maganghub.kemnaker.go.id/api/naco/login?redirect_url=/"), headers=browser_headers)
-    res_init = opener.open(req_init, timeout=15)
+    res_init = opener.open(req_init, timeout=25)
     html_init = res_init.read().decode("utf-8", errors="ignore")
     csrf = (re.search(r'name="csrf-token"\s+content="([^"]+)"', html_init) or ["", ""])[1]
 
@@ -197,13 +197,13 @@ def login_kemnaker(force_refresh=False):
         "Origin": "https://account.kemnaker.go.id",
         "Referer": res_init.geturl()
     })
-    res_login = opener.open(req_login, timeout=15)
+    res_login = opener.open(req_login, timeout=25)
     login_data = json.loads(res_login.read().decode("utf-8"))
     if not login_data.get("data", {}).get("authenticated"):
         raise Exception(f"Autentikasi gagal: {login_data}")
 
     # Callback handshake
-    opener.open(urllib.request.Request(wrap_url(login_data["data"]["redirect_uri"]), headers=browser_headers), timeout=15)
+    opener.open(urllib.request.Request(wrap_url(login_data["data"]["redirect_uri"]), headers=browser_headers), timeout=25)
 
     token = next((c.value for c in cj if c.name == "naco_access_token"), None)
     if not token:
@@ -288,7 +288,7 @@ def format_status_presensi():
     if not diag.get("success"):
         return f"🔍 *STATUS PRESENSI HARI INI*\n\n⏰ *Waktu:* `{diag['waktu']}`\n❌ *Status:* Gagal terhubung ke Kemnaker\n🚨 *Pesan:* `{diag['error']}`"
 
-    sisa, total = hitung_sisa_template()
+    sisa, total = hitung_sisa_template(token=_CACHED_TOKEN)
     sisa_info = f"📦 *Template Cadangan:* `{sisa} dari {total} template belum terpakai`\n\n"
 
     if diag["sudah_absen"]:
@@ -357,7 +357,7 @@ def ambil_riwayat_terpakai(token=None):
                 for h in data.get("history", []):
                     act = str(h.get("activity", "")).strip().lower()
                     if act:
-                        used_snippets.add(act[:40])
+                        used_snippets.add(act[:80])
         except Exception as e:
             print(f"[Template Warning] Gagal memuat used_templates.json: {e}", flush=True)
 
@@ -368,7 +368,7 @@ def ambil_riwayat_terpakai(token=None):
             for item in logs:
                 act = str(item.get("activity_log", "")).strip().lower()
                 if act:
-                    used_snippets.add(act[:40])
+                    used_snippets.add(act[:80])
         except Exception as e:
             print(f"[Template Warning] Gagal sinkronisasi daily-logs Kemnaker: {e}", flush=True)
 
@@ -387,7 +387,7 @@ def ambil_template_belum_terpakai(today_wib=None, token=None):
     belum_terpakai = []
     for t in templates:
         t_id = t.get("id")
-        t_act_snippet = str(t.get("activity", "")).strip().lower()[:40]
+        t_act_snippet = str(t.get("activity", "")).strip().lower()[:80]
         if (t_id is not None and t_id in used_ids) or (t_act_snippet in used_snippets):
             continue
         belum_terpakai.append(t)
@@ -412,6 +412,11 @@ def ambil_template_belum_terpakai(today_wib=None, token=None):
 
 def hitung_sisa_template(token=None):
     """Menghitung sisa template yang belum terpakai dan total template yang ada."""
+    if not token:
+        try:
+            token = _CACHED_TOKEN or login_kemnaker()
+        except Exception:
+            token = None
     _, sisa, total = ambil_template_belum_terpakai(token=token)
     return sisa, total
 
@@ -562,7 +567,7 @@ def main(force=False, notify_telegram=False):
     try:
         token = login_kemnaker()
         sudah, data_absen = periksa_absen_hari_ini(token, today_str)
-        if sudah:
+        if sudah and not force:
             msg = "monev sudah diisii"
             if notify_telegram:
                 kirim_telegram(msg)
