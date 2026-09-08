@@ -106,5 +106,46 @@ export default {
         headers: { "Content-Type": "application/json" }
       });
     }
+  },
+
+  /**
+   * CRON TRIGGER SCHEDULER (100% TEPAT WAKTU PER DETIK DI CLOUDFLARE EDGE)
+   * Jadwal:
+   * - 0 12 * * * = 12:00 UTC (19:00 WIB) -> Pengingat Santai
+   * - 0 13 * * * = 13:00 UTC (20:00 WIB) -> Pengingat Keras
+   * - 0 14 * * * = 14:00 UTC (21:00 WIB) -> Auto Monev Cadangan
+   */
+  async scheduled(event, env, ctx) {
+    const cron = event.cron;
+    const now = new Date();
+    const hourUtc = now.getUTCHours();
+
+    let targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=auto";
+
+    if (cron === "0 12 * * *" || hourUtc === 12) {
+      targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=reminder&mode=santai";
+    } else if (cron === "0 13 * * *" || hourUtc === 13) {
+      targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=reminder&mode=keras";
+    } else if (cron === "0 14 * * *" || hourUtc === 14) {
+      targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=auto";
+    } else if (hourUtc === 15) {
+      // Slot uji coba malam ini jam 22:xx WIB (Bypass guard check)
+      targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=reminder&mode=keras&force=1";
+    }
+
+    ctx.waitUntil(
+      fetch(targetEndpoint, {
+        method: "GET",
+        headers: {
+          "User-Agent": "Cloudflare-Worker-Cron/1.0"
+        }
+      }).then(async (res) => {
+        const body = await res.text();
+        console.log(`[CF Cron Success] ${targetEndpoint} -> HTTP ${res.status}: ${body}`);
+      }).catch((err) => {
+        console.error(`[CF Cron Error] ${targetEndpoint} -> ${err.message}`);
+      })
+    );
   }
 };
+
