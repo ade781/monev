@@ -1,5 +1,10 @@
 {
   "regions": ["sin1"],
+  "functions": {
+    "api/**/*.py": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/cron?type=reminder&mode=santai",
