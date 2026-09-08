@@ -504,12 +504,12 @@ def muat_template_pengingat():
         }
     return _REMINDER_TEMPLATES
 
-def kirim_pengingat_monev(chat_id=None, force_mode=None):
+def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
     try:
         sudah, _ = periksa_absen_hari_ini(login_kemnaker(), today_str)
-        if sudah:
+        if sudah and not force_send:
             print(f"[Pengingat] Presensi {today_str} sudah terisi. Pengingat dilewati.", flush=True)
             return {"status": "already_submitted", "message": "Presensi hari ini sudah terisi, pengingat dilewati."}
     except Exception as e:

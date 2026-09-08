@@ -311,7 +311,8 @@ class handler(BaseHTTPRequestHandler):
         # 2. Fitur Pengingat
         if "type" in query_params and query_params["type"][0] == "reminder":
             force_mode = query_params.get("mode", [None])[0]
-            result = monev_bot.kirim_pengingat_monev(force_mode=force_mode)
+            force_send = query_params.get("force", ["0"])[0] in ["1", "true"] or "force" in query_params
+            result = monev_bot.kirim_pengingat_monev(force_mode=force_mode, force_send=force_send)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
