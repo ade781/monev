@@ -128,9 +128,6 @@ export default {
       targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=reminder&mode=keras";
     } else if (cron === "0 14 * * *" || hourUtc === 14) {
       targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=auto";
-    } else if (hourUtc === 15) {
-      // Slot uji coba malam ini jam 22:xx WIB (Bypass guard check)
-      targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=reminder&mode=keras&force=1";
     }
 
     ctx.waitUntil(

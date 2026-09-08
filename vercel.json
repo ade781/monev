@@ -17,10 +17,6 @@
     {
       "path": "/api/cron?type=auto",
       "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/cron?type=reminder&mode=keras&force=1",
-      "schedule": "5 15 * * *"
     }
   ]
 }
