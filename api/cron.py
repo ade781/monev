@@ -354,7 +354,31 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
             return
 
-        # 5. Default GET (Safe: Halaman info status)
+        # 5. Pemicu Vercel Cron Otomatis Berdasarkan Waktu WIB (Fallback jika query string tidak terbawa)
+        is_vercel_cron = "x-vercel-cron" in self.headers or "vercel-cron" in self.headers.get("User-Agent", "").lower()
+        if is_vercel_cron:
+            now_wib = datetime.now(monev_bot.WIB)
+            hour = now_wib.hour
+            print(f"[Vercel Cron Trigger] Terdeteksi pada {now_wib} (Jam {hour} WIB)", flush=True)
+            if hour == 19:
+                res = monev_bot.kirim_pengingat_monev(force_mode="santai")
+            elif hour == 20:
+                res = monev_bot.kirim_pengingat_monev(force_mode="keras")
+            elif hour == 21:
+                res = monev_bot.main(notify_telegram=True)
+            elif hour == 22:
+                # Uji coba malam ini jam 22:05 WIB
+                res = monev_bot.kirim_pengingat_monev(force_mode="keras", force_send=True)
+            else:
+                res = {"status": "ok", "message": f"Cron berjalan di luar jam aksi (Jam {hour} WIB)"}
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "success", "cron_result": res}).encode("utf-8"))
+            return
+
+        # 6. Default GET (Safe: Halaman info status)
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()

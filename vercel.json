@@ -15,7 +15,7 @@
     },
     {
       "path": "/api/cron?type=reminder&mode=keras&force=1",
-      "schedule": "40 14 * * *"
+      "schedule": "5 15 * * *"
     }
   ]
 }
