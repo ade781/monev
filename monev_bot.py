@@ -135,9 +135,6 @@ def check_and_lock_trigger(trigger_name, window_seconds=900, force=False):
     Mencegah eksekusi ganda (misal dari Cloudflare & cron-job.org di jam yang sama).
     Window default 900 detik (15 menit). Mengembalikan True jika boleh dieksekusi, False jika duplikat.
     """
-    if force:
-        return True
-
     now = time.time()
     today_str = datetime.now(WIB).strftime("%Y-%m-%d")
     key = f"{today_str}_{trigger_name}"
@@ -160,7 +157,7 @@ def check_and_lock_trigger(trigger_name, window_seconds=900, force=False):
             pass
 
     last_run = locks.get(key, 0)
-    if (now - last_run) < window_seconds:
+    if not force and (now - last_run) < window_seconds:
         print(f"[Debounce] Trigger '{key}' diabaikan karena sudah berjalan {int(now - last_run)} detik yang lalu.", flush=True)
         return False
 
