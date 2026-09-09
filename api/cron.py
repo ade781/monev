@@ -322,7 +322,17 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(result).encode("utf-8"))
             return
 
-        # 3. Fitur Tes Diagnostik via GET (?test=1)
+        # 3. Fitur Monitoring Status & Heartbeat Sistem (09:00 WIB & 15:00 WIB)
+        if "type" in query_params and query_params["type"][0] in ["status", "status_check", "heartbeat", "check"]:
+            waktu_label = query_params.get("waktu", query_params.get("time", [None]))[0]
+            result = monev_bot.kirim_status_harian(waktu_label=waktu_label)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode("utf-8"))
+            return
+
+        # 4. Fitur Tes Diagnostik via GET (?test=1)
         if "test" in query_params:
             diag = monev_bot.test_koneksi_sistem()
             self.send_response(200)
@@ -331,7 +341,7 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(diag.encode("utf-8"))
             return
 
-        # 4. Trigger pengisian otomatis harian (dengan verifikasi CRON_SECRET)
+        # 5. Trigger pengisian otomatis harian (dengan verifikasi CRON_SECRET)
         if "type" in query_params and query_params["type"][0] in ["auto", "cron"]:
             cron_secret = os.getenv("CRON_SECRET", "").strip()
             auth_header = self.headers.get("Authorization", "")
@@ -357,13 +367,17 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
             return
 
-        # 5. Pemicu Vercel Cron Otomatis Berdasarkan Waktu WIB (Fallback jika query string tidak terbawa)
+        # 6. Pemicu Vercel Cron Otomatis Berdasarkan Waktu WIB (Fallback jika query string tidak terbawa)
         is_vercel_cron = "x-vercel-cron" in self.headers or "vercel-cron" in self.headers.get("User-Agent", "").lower()
         if is_vercel_cron:
             now_wib = datetime.now(monev_bot.WIB)
             hour = now_wib.hour
             print(f"[Vercel Cron Trigger] Terdeteksi pada {now_wib} (Jam {hour} WIB)", flush=True)
-            if hour == 19:
+            if hour == 9:
+                res = monev_bot.kirim_status_harian(waktu_label="pagi")
+            elif hour == 15:
+                res = monev_bot.kirim_status_harian(waktu_label="sore")
+            elif hour == 19:
                 res = monev_bot.kirim_pengingat_monev(force_mode="santai")
             elif hour == 20:
                 res = monev_bot.kirim_pengingat_monev(force_mode="keras")

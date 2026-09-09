@@ -534,6 +534,67 @@ def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
 
 kirim_pengingat_sore = kirim_pengingat_monev
 
+def kirim_status_harian(waktu_label=None, chat_id=None):
+    """Mengirim laporan status presensi & heartbeat kesehatan sistem di jam 09:00 WIB dan 15:00 WIB"""
+    today_wib = datetime.now(WIB)
+    today_str = today_wib.strftime("%Y-%m-%d")
+    jam_str = today_wib.strftime("%H:%M:%S")
+
+    waktu_title = "PAGI (09:00 WIB)" if waktu_label == "pagi" or (waktu_label is None and today_wib.hour < 12) else "SORE (15:00 WIB)"
+    icon_waktu = "🌅" if "PAGI" in waktu_title else "🌤️"
+
+    diag = periksa_koneksi_dan_status()
+    cf = os.getenv("CLOUDFLARE_WORKER_URL", "").strip()
+    proxy_st = "Aktif" if len(cf) > 5 else "Direct"
+
+    if not diag.get("success"):
+        pesan = (
+            f"{icon_waktu} *MONITORING SISTEM {waktu_title}*\n\n"
+            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+            "🚨 *Status Koneksi Kemnaker:* Gagal Terhubung\n"
+            f"❌ *Detail Kendala:* `{diag.get('error')}`\n\n"
+            "⚠️ _Sistem otomatis mendeteksi kendala pada login Kemnaker. Mohon periksa kembali kredensial atau server Kemnaker._"
+        )
+        kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
+        return {"status": "error", "message": diag.get("error")}
+
+    sisa, total = hitung_sisa_template(token=_CACHED_TOKEN)
+
+    act = ""
+    if diag.get("sudah_absen"):
+        dt = diag.get("data_absen") or {}
+        app_st = dt.get("approval_status", "SUBMITTED")
+        jam_absen = f"jam {dt['created_at'].split('T')[1][:8]} WIB" if "T" in dt.get("created_at", "") else "Tercatat"
+        if diag.get("activity_text"):
+            act = f"📝 *Kegiatan Terdata:*\n_{diag['activity_text']}_\n\n"
+        status_line = (
+            f"✅ *SUDAH TERISI (PRESENT)*\n"
+            f"⏱️ *Waktu Submit:* `{jam_absen}`\n"
+            f"📋 *Persetujuan Mentor:* `{app_st}`"
+        )
+        footer = "✨ _Presensi hari ini sudah aman dan tercatat di Kemnaker._"
+    else:
+        status_line = (
+            "⚠️ *BELUM TERISI*\n"
+            "💡 _Belum ada presensi untuk hari ini. Jangan lupa diisi sebelum batas malam ya!_"
+        )
+        footer = "👉 _Klik tombol di bawah atau ketik `/isi <kegiatan>` untuk mengisi laporan hari ini._"
+
+    pesan = (
+        f"{icon_waktu} *MONITORING MONEV & SISTEM ({waktu_title})*\n\n"
+        "🤖 *Status Sistem & Trigger:* ✅ *Aktif & Berfungsi Normal*\n"
+        f"🌐 *Jalur Proxy:* `{proxy_st}` | 🔐 *SSO Kemnaker:* `Terhubung`\n"
+        f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+        f"👤 *Peserta:* `{diag['user_name']}`\n\n"
+        f"📊 *Status Presensi Hari Ini:*\n{status_line}\n\n"
+        f"{act}"
+        f"📦 *Stok Template Cadangan:* `{sisa} dari {total} template`\n\n"
+        f"{footer}"
+    )
+
+    kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
+    return {"status": "success", "sudah_absen": diag.get("sudah_absen"), "message": "Notifikasi status harian terkirim"}
+
 def ambil_rekap_mingguan():
     try:
         attendances = api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances", login_kemnaker()).get("data", [])
