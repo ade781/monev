@@ -8,8 +8,9 @@ Sistem monitoring, pengingat, dan pengisian presensi cerdas otomatis untuk Magan
 
 1. **Auto SSO Kemnaker**: Mengambil Bearer Token secara otomatis menggunakan kredensial SIAPkerja.
 2. **Pengecekan Aman (Guard Check)**: Jika sudah presensi mandiri, bot tidak akan menimpa data yang ada.
-3. **Pengingat Santai (19:00 WIB) & Keras (20:00 WIB)**: Pengingat Telegram bervariasi setiap hari (Senin–Minggu).
-4. **Auto Monev Cadangan (21:00 WIB)**: Jaring pengaman otomatis di jam 9 malam jika belum mengisi.
+3. **Monitoring Pagi (09:00 WIB) & Sore (15:00 WIB)**: Notifikasi status kehadiran harian sekaligus pengecekan kesehatan koneksi sistem/heartbeat trigger.
+4. **Pengingat Santai (19:00 WIB) & Keras (20:00 WIB)**: Pengingat Telegram bervariasi setiap hari (Senin–Minggu) jika belum absen.
+5. **Auto Monev Cadangan (21:00 WIB)**: Jaring pengaman otomatis di jam 9 malam jika belum mengisi.
 5. **Human Jitter & GPS Jitter**: Jeda acak manusiawi dan deviasi koordinat natural (10–25m).
 6. **35 Variasi Template Autentik (Anti-Duplikasi)**: Template kegiatan magang nyata (ARFF YIA Angkasa Pura, React, Express, QR Code, inspeksi APAR, koordinasi). Sistem menjamin setiap template yang sudah dipakai **tidak akan dipakai lagi**.
 7. **Laporan Sisa Template Otomatis**: Saat auto-monev jam 21:00 WIB berjalan, notifikasi menyertakan informasi sisa template yang belum terpakai dan peringatan jika stok menipis.
