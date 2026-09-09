@@ -9,6 +9,7 @@ import re
 import json
 import time
 import random
+import tempfile
 import urllib.request
 import urllib.parse
 import http.cookiejar
@@ -81,6 +82,96 @@ _CACHED_TOKEN = None
 _CACHED_TOKEN_TIME = 0
 _REMINDER_TEMPLATES = None
 _ACTIVITY_TEMPLATES = None
+_TRIGGER_HISTORY = {}
+
+# Utilitas Sanitasi Markdown Telegram
+def safe_markdown(text, max_len=None):
+    """Membersihkan karakter khusus agar tidak menyebabkan error parse_mode Markdown Telegram"""
+    if not text:
+        return ""
+    clean = str(text).replace("_", " ").replace("`", "'")
+    clean = re.sub(r"\s+", " ", clean).strip()
+    if max_len and len(clean) > max_len:
+        clean = clean[:max_len].rstrip() + "..."
+    return clean
+
+# Utilitas Disk Cache Token SSO (Antar-Panggilan Serverless)
+def _token_cache_file():
+    return os.path.join(tempfile.gettempdir(), "kemnaker_token_cache.json")
+
+def _get_cached_token_from_disk():
+    path = _token_cache_file()
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                token = data.get("token")
+                ts = data.get("timestamp", 0)
+                if token and (time.time() - ts) < 900:
+                    return token, ts
+        except Exception:
+            pass
+    return None, 0
+
+def _save_cached_token_to_disk(token):
+    path = _token_cache_file()
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"token": token, "timestamp": time.time()}, f)
+    except Exception:
+        pass
+
+def _clear_cached_token_from_disk():
+    path = _token_cache_file()
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
+
+# Mekanisme Anti-Spam & Deduplikasi Trigger (Debounce 15 Menit)
+def check_and_lock_trigger(trigger_name, window_seconds=900, force=False):
+    """
+    Mencegah eksekusi ganda (misal dari Cloudflare & cron-job.org di jam yang sama).
+    Window default 900 detik (15 menit). Mengembalikan True jika boleh dieksekusi, False jika duplikat.
+    """
+    if force:
+        return True
+
+    now = time.time()
+    today_str = datetime.now(WIB).strftime("%Y-%m-%d")
+    key = f"{today_str}_{trigger_name}"
+
+    lock_file = os.path.join(tempfile.gettempdir(), "monev_trigger_locks.json")
+    locks = {}
+
+    global _TRIGGER_HISTORY
+    locks.update(_TRIGGER_HISTORY)
+
+    if os.path.exists(lock_file):
+        try:
+            with open(lock_file, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                if isinstance(saved, dict):
+                    for k, v in saved.items():
+                        if k not in locks or v > locks[k]:
+                            locks[k] = v
+        except Exception:
+            pass
+
+    last_run = locks.get(key, 0)
+    if (now - last_run) < window_seconds:
+        print(f"[Debounce] Trigger '{key}' diabaikan karena sudah berjalan {int(now - last_run)} detik yang lalu.", flush=True)
+        return False
+
+    locks[key] = now
+    _TRIGGER_HISTORY[key] = now
+    try:
+        with open(lock_file, "w", encoding="utf-8") as f:
+            json.dump(locks, f)
+    except Exception:
+        pass
+    return True
 
 # 2. Utilitas Jaringan & Koordinat
 def wrap_url(target_url):
@@ -107,6 +198,7 @@ def api_call(endpoint, token, method="GET", payload=None):
     except urllib.error.HTTPError as e:
         if e.code == 401:
             _CACHED_TOKEN = None
+            _clear_cached_token_from_disk()
         try:
             err_data = json.loads(e.read().decode("utf-8"))
             msg = err_data.get("message") or err_data.get("error") or str(e)
@@ -167,8 +259,14 @@ def kirim_telegram(pesan, chat_id=None, reply_markup=None):
 def login_kemnaker(force_refresh=False):
     global _CACHED_TOKEN, _CACHED_TOKEN_TIME
     now = time.time()
-    if not force_refresh and _CACHED_TOKEN and (now - _CACHED_TOKEN_TIME) < 900:
-        return _CACHED_TOKEN
+    if not force_refresh:
+        if _CACHED_TOKEN and (now - _CACHED_TOKEN_TIME) < 900:
+            return _CACHED_TOKEN
+        disk_token, disk_ts = _get_cached_token_from_disk()
+        if disk_token:
+            _CACHED_TOKEN = disk_token
+            _CACHED_TOKEN_TIME = disk_ts
+            return disk_token
 
     manual = os.getenv("KEMNAKER_BEARER_TOKEN")
     if manual and len(manual) > 20:
@@ -211,6 +309,7 @@ def login_kemnaker(force_refresh=False):
 
     _CACHED_TOKEN = token
     _CACHED_TOKEN_TIME = now
+    _save_cached_token_to_disk(token)
     return token
 
 # 4. Pengecekan & Diagnosis Sistem
@@ -286,20 +385,24 @@ def format_status_presensi():
     """Fungsi cek presensi hari ini untuk /cek (Read-only)"""
     diag = periksa_koneksi_dan_status()
     if not diag.get("success"):
-        return f"🔍 *STATUS PRESENSI HARI INI*\n\n⏰ *Waktu:* `{diag['waktu']}`\n❌ *Status:* Gagal terhubung ke Kemnaker\n🚨 *Pesan:* `{diag['error']}`"
+        err_msg = safe_markdown(diag.get("error", "Koneksi terputus"), max_len=200)
+        return f"🔍 *STATUS PRESENSI HARI INI*\n\n⏰ *Waktu:* `{diag['waktu']}`\n❌ *Status:* Gagal terhubung ke Kemnaker\n🚨 *Pesan:* `{err_msg}`"
 
     sisa, total = hitung_sisa_template(token=_CACHED_TOKEN)
     sisa_info = f"📦 *Template Cadangan:* `{sisa} dari {total} template belum terpakai`\n\n"
+    user_name = safe_markdown(diag.get("user_name", "Mas Ade"))
+    mentor_name = safe_markdown(diag.get("mentor_name", "-"))
 
     if diag["sudah_absen"]:
         dt = diag.get("data_absen") or {}
         app_st = dt.get("approval_status", "SUBMITTED")
         jam = f" (Tercatat jam {dt['created_at'].split('T')[1][:8]} WIB)" if "T" in dt.get("created_at", "") else ""
-        act = f"📝 *Kegiatan Terdata:*\n_{diag['activity_text']}_\n\n" if diag.get("activity_text") else ""
+        act_clean = safe_markdown(diag.get("activity_text", ""), max_len=280)
+        act = f"📝 *Kegiatan Terdata:*\n_{act_clean}_\n\n" if act_clean else ""
         return (
             "🔍 *STATUS PRESENSI HARI INI*\n\n"
-            f"👤 *Nama Peserta:* `{diag['user_name']}`\n"
-            f"🏢 *Nama Mentor:* `{diag['mentor_name']}`\n"
+            f"👤 *Nama Peserta:* `{user_name}`\n"
+            f"🏢 *Nama Mentor:* `{mentor_name}`\n"
             f"📅 *Tanggal:* `{diag['today_str']}`\n"
             f"⏰ *Waktu Cek:* `{diag['waktu']}`\n\n"
             f"📊 *Status:* ✅ *SUDAH TERISI (PRESENT)*{jam}\n"
@@ -310,8 +413,8 @@ def format_status_presensi():
         )
     return (
         "🔍 *STATUS PRESENSI HARI INI*\n\n"
-        f"👤 *Nama Peserta:* `{diag['user_name']}`\n"
-        f"🏢 *Nama Mentor:* `{diag['mentor_name']}`\n"
+        f"👤 *Nama Peserta:* `{user_name}`\n"
+        f"🏢 *Nama Mentor:* `{mentor_name}`\n"
         f"📅 *Tanggal:* `{diag['today_str']}`\n"
         f"⏰ *Waktu Cek:* `{diag['waktu']}`\n\n"
         "📊 *Status Presensi:* ⚠️ *BELUM TERISI*\n\n"
@@ -340,26 +443,39 @@ def muat_semua_template():
             }]
     return _ACTIVITY_TEMPLATES
 
+def _baca_file_used_templates():
+    """Membaca riwayat used_templates baik dari root project maupun fallback /tmp"""
+    p_local = os.path.join(os.path.dirname(__file__), "used_templates.json")
+    p_tmp = os.path.join(tempfile.gettempdir(), "monev_used_templates.json")
+    data = {"used_ids": [], "history": []}
+
+    for p in [p_local, p_tmp]:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    content = json.load(f)
+                    if isinstance(content, dict):
+                        data["used_ids"].extend(content.get("used_ids", []))
+                        data["history"].extend(content.get("history", []))
+            except Exception:
+                pass
+    data["used_ids"] = sorted(list(set(data["used_ids"])))
+    return data
+
 def ambil_riwayat_terpakai(token=None):
     """Mengambil riwayat template yang sudah dipakai dari used_templates.json
     serta verifikasi silang langsung dengan riwayat daily-logs di Kemnaker."""
     used_ids = set()
     used_snippets = set()
 
-    # 1. Baca dari used_templates.json
-    p = os.path.join(os.path.dirname(__file__), "used_templates.json")
-    if os.path.exists(p):
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                for i in data.get("used_ids", []):
-                    used_ids.add(i)
-                for h in data.get("history", []):
-                    act = str(h.get("activity", "")).strip().lower()
-                    if act:
-                        used_snippets.add(act[:80])
-        except Exception as e:
-            print(f"[Template Warning] Gagal memuat used_templates.json: {e}", flush=True)
+    # 1. Baca dari file lokal & /tmp
+    data = _baca_file_used_templates()
+    for i in data.get("used_ids", []):
+        used_ids.add(i)
+    for h in data.get("history", []):
+        act = str(h.get("activity", "")).strip().lower()
+        if act:
+            used_snippets.add(act[:80])
 
     # 2. Verifikasi silang dengan riwayat daily-logs dari Kemnaker
     if token:
@@ -421,18 +537,11 @@ def hitung_sisa_template(token=None):
     return sisa, total
 
 def tandai_template_terpakai(template, date_str):
-    """Mencatat template yang telah dipakai ke file used_templates.json agar tidak dipakai lagi."""
+    """Mencatat template yang telah dipakai ke file used_templates.json (dengan fallback /tmp jika read-only)"""
     if not template or not isinstance(template, dict):
         return
     t_id = template.get("id")
-    p = os.path.join(os.path.dirname(__file__), "used_templates.json")
-    data = {"used_ids": [], "history": []}
-    if os.path.exists(p):
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            data = {"used_ids": [], "history": []}
+    data = _baca_file_used_templates()
 
     used_ids = set(data.get("used_ids", []))
     if t_id is not None:
@@ -450,11 +559,24 @@ def tandai_template_terpakai(template, date_str):
     })
     data["history"] = history
 
+    # Coba tulis ke root project
+    p_local = os.path.join(os.path.dirname(__file__), "used_templates.json")
+    saved = False
     try:
-        with open(p, "w", encoding="utf-8") as f:
+        with open(p_local, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"[Template Error] Gagal mencatat template terpakai: {e}", flush=True)
+        saved = True
+    except OSError:
+        pass
+
+    # Fallback simpan ke /tmp jika root project read-only di serverless Vercel
+    if not saved:
+        p_tmp = os.path.join(tempfile.gettempdir(), "monev_used_templates.json")
+        try:
+            with open(p_tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[Template Error] Gagal mencatat template ke /tmp: {e}", flush=True)
 
 def ambil_template(today_wib, token=None):
     """Fungsi pembungkus kompatibilitas yang mengembalikan 1 template belum terpakai."""
@@ -512,6 +634,7 @@ def muat_template_pengingat():
 def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
+    is_weekend = today_wib.weekday() >= 5
     try:
         sudah, _ = periksa_absen_hari_ini(login_kemnaker(), today_str)
         if sudah and not force_send:
@@ -523,10 +646,13 @@ def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
     temps = muat_template_pengingat()
     is_keras = force_mode == "keras" or (force_mode is None and today_wib.hour >= 20)
     daftar = temps.get("keras_20" if is_keras else "santai_19", [])
+    salam_random = random.choice(daftar) if daftar else "Halo Mas Ade, jangan lupa isi monev hari ini ya!"
+    catatan_weekend = "\n🏖️ _Catatan: Jika hari ini Anda libur magang/tidak ada shift, silakan abaikan pengingat ini._\n" if is_weekend else ""
+
     pesan = (
-        f"{random.choice(daftar) if daftar else 'Halo Mas Ade, jangan lupa isi monev hari ini ya!'}\n\n"
+        f"{salam_random}\n\n"
         f"_{('🔥 PENGINGAT KERAS JAM 20:00 WIB' if is_keras else '☕ PENGINGAT SANTAI JAM 19:00 WIB')}_\n"
-        "⏰ *Batas Waktu Mandiri:* Sebelum 21:00 WIB\n"
+        f"⏰ *Batas Waktu Mandiri:* Sebelum 21:00 WIB{catatan_weekend}\n"
         "💡 _Ketik `/isi <kegiatan>` atau klik tombol di bawah._"
     )
     kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
@@ -539,9 +665,11 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
     jam_str = today_wib.strftime("%H:%M:%S")
+    is_weekend = today_wib.weekday() >= 5
 
     is_pagi = waktu_label == "pagi" or (waktu_label is None and today_wib.hour < 12)
-    waktu_title = "PAGI (09:00 WIB)" if is_pagi else "SORE (15:00 WIB)"
+    weekend_badge = " 🏖️ [AKHIR PEKAN]" if is_weekend else ""
+    waktu_title = f"{'PAGI (09:00 WIB)' if is_pagi else 'SORE (15:00 WIB)'}{weekend_badge}"
     icon_waktu = "🌅" if is_pagi else "🌤️"
 
     temps = muat_template_pengingat()
@@ -553,13 +681,14 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
     proxy_st = "Aktif" if len(cf) > 5 else "Direct"
 
     if not diag.get("success"):
+        err_clean = safe_markdown(diag.get("error", "Koneksi terputus"), max_len=200)
         pesan = (
             f"{salam_text}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"{icon_waktu} *MONITORING SISTEM {waktu_title}*\n\n"
             f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
             "🚨 *Status Koneksi Kemnaker:* Gagal Terhubung\n"
-            f"❌ *Detail Kendala:* `{diag.get('error')}`\n\n"
+            f"❌ *Detail Kendala:* `{err_clean}`\n\n"
             "⚠️ _Sistem otomatis mendeteksi kendala pada login Kemnaker. Mohon periksa kembali kredensial atau server Kemnaker._"
         )
         kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
@@ -568,12 +697,14 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
     sisa, total = hitung_sisa_template(token=_CACHED_TOKEN)
 
     act = ""
+    user_name = safe_markdown(diag.get("user_name", "Mas Ade"))
     if diag.get("sudah_absen"):
         dt = diag.get("data_absen") or {}
         app_st = dt.get("approval_status", "SUBMITTED")
         jam_absen = f"jam {dt['created_at'].split('T')[1][:8]} WIB" if "T" in dt.get("created_at", "") else "Tercatat"
-        if diag.get("activity_text"):
-            act = f"📝 *Kegiatan Terdata:*\n_{diag['activity_text']}_\n\n"
+        act_clean = safe_markdown(diag.get("activity_text", ""), max_len=280)
+        if act_clean:
+            act = f"📝 *Kegiatan Terdata:*\n_{act_clean}_\n\n"
         status_line = (
             f"✅ *SUDAH TERISI (PRESENT)*\n"
             f"⏱️ *Waktu Submit:* `{jam_absen}`\n"
@@ -594,7 +725,7 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
         "🤖 *Status Sistem & Trigger:* ✅ *Aktif & Berfungsi Normal*\n"
         f"🌐 *Jalur Proxy:* `{proxy_st}` | 🔐 *SSO Kemnaker:* `Terhubung`\n"
         f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
-        f"👤 *Peserta:* `{diag['user_name']}`\n\n"
+        f"👤 *Peserta:* `{user_name}`\n\n"
         f"📊 *Status Presensi Hari Ini:*\n{status_line}\n\n"
         f"{act}"
         f"📦 *Stok Template Cadangan:* `{sisa} dari {total} template`\n\n"

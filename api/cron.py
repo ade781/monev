@@ -39,15 +39,19 @@ def _get_pending(chat_id):
             pass
     return text
 
-# Keyboard konfirmasi khusus /isi
-CONFIRM_ISI_KEYBOARD = {
-    "inline_keyboard": [
-        [
-            {"text": "✅ Ya, Kirim Sekarang", "callback_data": "/isi_confirm"},
-            {"text": "❌ Batalkan", "callback_data": "/monev_cancel"}
+# Keyboard konfirmasi khusus /isi dengan callback data dinamis
+def make_isi_confirm_keyboard(kegiatan):
+    data_cb = "/isi_confirm"
+    if kegiatan and len(kegiatan.encode("utf-8")) <= 40:
+        data_cb = f"/isi_ok:{kegiatan}"
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Ya, Kirim Sekarang", "callback_data": data_cb},
+                {"text": "❌ Batalkan", "callback_data": "/monev_cancel"}
+            ]
         ]
-    ]
-}
+    }
 
 def handle_telegram_command(chat_id, text):
     """Memproses command Telegram dari pengguna dan mengembalikan (teks_balasan, keyboard)"""
@@ -55,7 +59,8 @@ def handle_telegram_command(chat_id, text):
     if owner_chat_id and str(chat_id).strip() != owner_chat_id:
         return ("⛔ *Akses Ditolak*\nBot ini bersifat privat dan hanya merespons Mas Ade.", None)
 
-    cmd = text.split()[0].lower().split("@")[0] if text else ""
+    raw_text = text.strip() if text else ""
+    cmd = raw_text.split()[0].lower().split("@")[0] if raw_text else ""
 
     if cmd in ["/start", "/help", "/bantuan"]:
         return (
@@ -86,7 +91,8 @@ def handle_telegram_command(chat_id, text):
         if diag.get("success") and diag.get("sudah_absen"):
             dt = diag.get("data_absen") or {}
             jam = f" (Tercatat jam {dt['created_at'].split('T')[1][:8]} WIB)" if "T" in dt.get("created_at", "") else ""
-            act = f"\n\n📝 *Kegiatan Terdata:*\n_{diag['activity_text']}_" if diag.get("activity_text") else ""
+            act_clean = monev_bot.safe_markdown(diag.get('activity_text', ''), max_len=280)
+            act = f"\n\n📝 *Kegiatan Terdata:*\n_{act_clean}_" if act_clean else ""
             return (f"✅ *Presensi Monev Hari Ini Sudah Terisi!*{jam}\nAnda sudah tercatat hadir (PRESENT). Tidak perlu mengisi ulang.{act}", monev_bot.MENU_KEYBOARD)
 
         today_wib = datetime.now(monev_bot.WIB)
@@ -101,15 +107,19 @@ def handle_telegram_command(chat_id, text):
             monev_bot.CONFIRM_KEYBOARD
         )
 
-    elif cmd in ["/monev_confirm", "ya", "/ya"]:
+    elif cmd in ["/monev_confirm"]:
         try:
             res = monev_bot.main(force=True, notify_telegram=False)
             return (res.get("message", "Selesai dieksekusi"), monev_bot.MENU_KEYBOARD)
         except Exception as e:
             return (f"❌ *Gagal Eksekusi:* `{str(e)}`", monev_bot.MENU_KEYBOARD)
 
-    elif cmd in ["/isi_confirm"]:
-        kegiatan = _get_pending(chat_id)
+    elif raw_text.startswith("/isi_ok:") or cmd in ["/isi_confirm"] or (cmd in ["ya", "/ya"] and _get_pending(chat_id)):
+        if raw_text.startswith("/isi_ok:"):
+            kegiatan = raw_text[len("/isi_ok:"):].strip()
+        else:
+            kegiatan = _get_pending(chat_id)
+
         if not kegiatan:
             return ("⚠️ *Sesi Kedaluwarsa*\nTidak ada catatan kegiatan yang tertunda. Silakan ketik ulang `/isi <kegiatan>`.", monev_bot.MENU_KEYBOARD)
 
@@ -120,15 +130,23 @@ def handle_telegram_command(chat_id, text):
         try:
             res = monev_bot.submit_monev(custom_activity=kegiatan)
             msg = res.get("message") or "Laporan berhasil diserahkan ke server Kemnaker!"
+            keg_clean = monev_bot.safe_markdown(kegiatan, max_len=280)
             return (
                 "📝 *PENGISIAN KEGIATAN KUSTOM BERHASIL*\n\n"
                 "👤 *Peserta:* `Mas Ade`\n"
-                f"📌 *Kegiatan:* _{kegiatan}_\n\n"
+                f"📌 *Kegiatan:* _{keg_clean}_\n\n"
                 f"📡 *Respon Server:* `{msg}`",
                 monev_bot.MENU_KEYBOARD
             )
         except Exception as e:
             return (f"❌ *Gagal Kirim:* `{str(e)}`", monev_bot.MENU_KEYBOARD)
+
+    elif cmd in ["ya", "/ya"]:
+        try:
+            res = monev_bot.main(force=True, notify_telegram=False)
+            return (res.get("message", "Selesai dieksekusi"), monev_bot.MENU_KEYBOARD)
+        except Exception as e:
+            return (f"❌ *Gagal Eksekusi:* `{str(e)}`", monev_bot.MENU_KEYBOARD)
 
     elif cmd in ["/monev_cancel", "tidak", "/tidak", "/batal"]:
         _get_pending(chat_id)
@@ -142,7 +160,7 @@ def handle_telegram_command(chat_id, text):
         return (monev_bot.ambil_rekap_mingguan(), monev_bot.MENU_KEYBOARD)
 
     elif cmd in ["/isi"]:
-        kegiatan = text[len(cmd):].strip()
+        kegiatan = raw_text[len(cmd):].strip()
         if not kegiatan:
             return (
                 "⚠️ *Format Pengisian Kegiatan Kustom:*\n"
@@ -160,13 +178,15 @@ def handle_telegram_command(chat_id, text):
         today_wib = datetime.now(monev_bot.WIB)
         today_str = today_wib.strftime("%Y-%m-%d")
         jam_str = today_wib.strftime("%H:%M:%S")
+        keg_clean = monev_bot.safe_markdown(kegiatan, max_len=280)
 
         return (
             "⚠️ *KONFIRMASI PENGISIAN KEGIATAN KUSTOM*\n\n"
             f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
-            f"📝 *Kegiatan:*\n_{kegiatan}_\n\n"
-            "Apakah Anda yakin ingin submit laporan ini ke Kemnaker sekarang?",
-            CONFIRM_ISI_KEYBOARD
+            f"📝 *Kegiatan:*\n_{keg_clean}_\n\n"
+            "Apakah Anda yakin ingin submit laporan ini ke Kemnaker sekarang?\n"
+            "👇 _Klik tombol di bawah atau balas chat ini dengan ketik:_ `ya`",
+            make_isi_confirm_keyboard(kegiatan)
         )
 
     elif cmd in ["/proxy"]:
@@ -315,6 +335,13 @@ class handler(BaseHTTPRequestHandler):
         if "type" in query_params and query_params["type"][0] == "reminder":
             force_mode = query_params.get("mode", [None])[0]
             force_send = query_params.get("force", ["0"])[0] in ["1", "true"] or "force" in query_params
+            trigger_key = f"reminder_{force_mode or 'auto'}"
+            if not monev_bot.check_and_lock_trigger(trigger_key, force=force_send):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "duplicate_skipped", "message": f"Pengingat {trigger_key} sudah dijalankan baru-baru ini."}).encode("utf-8"))
+                return
             result = monev_bot.kirim_pengingat_monev(force_mode=force_mode, force_send=force_send)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -325,6 +352,14 @@ class handler(BaseHTTPRequestHandler):
         # 3. Fitur Monitoring Status & Heartbeat Sistem (09:00 WIB & 15:00 WIB)
         if "type" in query_params and query_params["type"][0] in ["status", "status_check", "heartbeat", "check"]:
             waktu_label = query_params.get("waktu", query_params.get("time", [None]))[0]
+            force_send = query_params.get("force", ["0"])[0] in ["1", "true"] or "force" in query_params
+            trigger_key = f"status_{waktu_label or 'auto'}"
+            if not monev_bot.check_and_lock_trigger(trigger_key, force=force_send):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "duplicate_skipped", "message": f"Status check {trigger_key} sudah dijalankan baru-baru ini."}).encode("utf-8"))
+                return
             result = monev_bot.kirim_status_harian(waktu_label=waktu_label)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -346,12 +381,20 @@ class handler(BaseHTTPRequestHandler):
             cron_secret = os.getenv("CRON_SECRET", "").strip()
             auth_header = self.headers.get("Authorization", "")
             provided_secret = query_params.get("secret", [""])[0]
+            force_send = query_params.get("force", ["0"])[0] in ["1", "true"] or "force" in query_params
 
             if cron_secret and provided_secret != cron_secret and auth_header != f"Bearer {cron_secret}":
                 self.send_response(401)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(b'{"error": "Unauthorized: Invalid CRON_SECRET"}')
+                return
+
+            if not monev_bot.check_and_lock_trigger("auto_monev", force=force_send):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "duplicate_skipped", "message": "Auto monev sudah diproses baru-baru ini."}).encode("utf-8"))
                 return
 
             try:
@@ -373,18 +416,18 @@ class handler(BaseHTTPRequestHandler):
             now_wib = datetime.now(monev_bot.WIB)
             hour = now_wib.hour
             print(f"[Vercel Cron Trigger] Terdeteksi pada {now_wib} (Jam {hour} WIB)", flush=True)
-            if hour == 9:
+            if hour == 9 and monev_bot.check_and_lock_trigger("status_pagi"):
                 res = monev_bot.kirim_status_harian(waktu_label="pagi")
-            elif hour == 15:
+            elif hour == 15 and monev_bot.check_and_lock_trigger("status_sore"):
                 res = monev_bot.kirim_status_harian(waktu_label="sore")
-            elif hour == 19:
+            elif hour == 19 and monev_bot.check_and_lock_trigger("reminder_santai"):
                 res = monev_bot.kirim_pengingat_monev(force_mode="santai")
-            elif hour == 20:
+            elif hour == 20 and monev_bot.check_and_lock_trigger("reminder_keras"):
                 res = monev_bot.kirim_pengingat_monev(force_mode="keras")
-            elif hour == 21:
+            elif hour == 21 and monev_bot.check_and_lock_trigger("auto_monev"):
                 res = monev_bot.main(notify_telegram=True)
             else:
-                res = {"status": "ok", "message": f"Cron berjalan di luar jam aksi (Jam {hour} WIB)"}
+                res = {"status": "ok", "message": f"Cron berjalan di luar jam aksi atau sudah dieksekusi (Jam {hour} WIB)"}
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
