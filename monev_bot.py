@@ -540,8 +540,13 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
     today_str = today_wib.strftime("%Y-%m-%d")
     jam_str = today_wib.strftime("%H:%M:%S")
 
-    waktu_title = "PAGI (09:00 WIB)" if waktu_label == "pagi" or (waktu_label is None and today_wib.hour < 12) else "SORE (15:00 WIB)"
-    icon_waktu = "🌅" if "PAGI" in waktu_title else "🌤️"
+    is_pagi = waktu_label == "pagi" or (waktu_label is None and today_wib.hour < 12)
+    waktu_title = "PAGI (09:00 WIB)" if is_pagi else "SORE (15:00 WIB)"
+    icon_waktu = "🌅" if is_pagi else "🌤️"
+
+    temps = muat_template_pengingat()
+    salam_list = temps.get("pagi_09" if is_pagi else "sore_15", [])
+    salam_text = random.choice(salam_list) if salam_list else ("Selamat pagi Mas Ade!" if is_pagi else "Selamat sore Mas Ade!")
 
     diag = periksa_koneksi_dan_status()
     cf = os.getenv("CLOUDFLARE_WORKER_URL", "").strip()
@@ -549,6 +554,8 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
 
     if not diag.get("success"):
         pesan = (
+            f"{salam_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"{icon_waktu} *MONITORING SISTEM {waktu_title}*\n\n"
             f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
             "🚨 *Status Koneksi Kemnaker:* Gagal Terhubung\n"
@@ -581,6 +588,8 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
         footer = "👉 _Klik tombol di bawah atau ketik `/isi <kegiatan>` untuk mengisi laporan hari ini._"
 
     pesan = (
+        f"{salam_text}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{icon_waktu} *MONITORING MONEV & SISTEM ({waktu_title})*\n\n"
         "🤖 *Status Sistem & Trigger:* ✅ *Aktif & Berfungsi Normal*\n"
         f"🌐 *Jalur Proxy:* `{proxy_st}` | 🔐 *SSO Kemnaker:* `Terhubung`\n"
