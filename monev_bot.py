@@ -84,6 +84,9 @@ _REMINDER_TEMPLATES = None
 _ACTIVITY_TEMPLATES = None
 _TRIGGER_HISTORY = {}
 
+# Masa berlaku token SSO Kemnaker (Kemnaker asli = 21600 detik / 6 jam; kita beri batas aman 20000 detik / ~5.5 jam)
+TOKEN_CACHE_TTL = 20000
+
 # Utilitas Sanitasi Markdown Telegram
 def safe_markdown(text, max_len=None):
     """Membersihkan karakter khusus agar tidak menyebabkan error parse_mode Markdown Telegram"""
@@ -107,7 +110,7 @@ def _get_cached_token_from_disk():
                 data = json.load(f)
                 token = data.get("token")
                 ts = data.get("timestamp", 0)
-                if token and (time.time() - ts) < 900:
+                if token and (time.time() - ts) < TOKEN_CACHE_TTL:
                     return token, ts
         except Exception:
             pass
@@ -257,7 +260,7 @@ def login_kemnaker(force_refresh=False):
     global _CACHED_TOKEN, _CACHED_TOKEN_TIME
     now = time.time()
     if not force_refresh:
-        if _CACHED_TOKEN and (now - _CACHED_TOKEN_TIME) < 900:
+        if _CACHED_TOKEN and (now - _CACHED_TOKEN_TIME) < TOKEN_CACHE_TTL:
             return _CACHED_TOKEN
         disk_token, disk_ts = _get_cached_token_from_disk()
         if disk_token:
