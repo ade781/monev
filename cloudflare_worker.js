@@ -146,17 +146,42 @@ export default {
       reqHeaders["Authorization"] = `Bearer ${cronSecret}`;
     }
 
-    ctx.waitUntil(
-      fetch(targetEndpoint, {
-        method: "GET",
-        headers: reqHeaders
-      }).then(async (res) => {
-        const body = await res.text();
-        console.log(`[CF Cron Success] ${targetEndpoint} -> HTTP ${res.status}: ${body}`);
-      }).catch((err) => {
-        console.error(`[CF Cron Error] ${targetEndpoint} -> ${err.message}`);
-      })
-    );
+    // Fungsi pemanggil dengan Timeout 55s dan Auto-Retry 2x jika terjadi kendala jaringan/cold start
+    const executeScheduledTask = async () => {
+      const maxRetries = 2;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort("Request Timeout 55s"), 55000);
+        try {
+          console.log(`[CF Cron Trigger] (Percobaan ${attempt}/${maxRetries}) Menghubungi: ${targetEndpoint}`);
+          const res = await fetch(targetEndpoint, {
+            method: "GET",
+            headers: reqHeaders,
+            signal: controller.signal
+          });
+          clearTimeout(timer);
+
+          const body = await res.text();
+          if (res.ok) {
+            console.log(`[CF Cron Success] HTTP ${res.status}: ${body.slice(0, 200)}`);
+            return;
+          } else {
+            console.warn(`[CF Cron Warning] HTTP ${res.status} pada percobaan ${attempt}: ${body.slice(0, 200)}`);
+            if (attempt < maxRetries) {
+              await new Promise(r => setTimeout(r, 3000)); // jeda 3 detik sebelum coba lagi
+            }
+          }
+        } catch (err) {
+          clearTimeout(timer);
+          console.error(`[CF Cron Error] Gagal pada percobaan ${attempt}: ${err.name === "AbortError" ? "Timeout 55s" : err.message}`);
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, 3000));
+          }
+        }
+      }
+    };
+
+    ctx.waitUntil(executeScheduledTask());
   }
 };
 
