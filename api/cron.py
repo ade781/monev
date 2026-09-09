@@ -369,9 +369,6 @@ class handler(BaseHTTPRequestHandler):
                 res = monev_bot.kirim_pengingat_monev(force_mode="keras")
             elif hour == 21:
                 res = monev_bot.main(notify_telegram=True)
-            elif hour == 22:
-                # Uji coba malam ini jam 22:05 WIB
-                res = monev_bot.kirim_pengingat_monev(force_mode="keras", force_send=True)
             else:
                 res = {"status": "ok", "message": f"Cron berjalan di luar jam aksi (Jam {hour} WIB)"}
 

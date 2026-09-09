@@ -110,7 +110,7 @@ export default {
 
   /**
    * CRON TRIGGER SCHEDULER (100% TEPAT WAKTU PER DETIK DI CLOUDFLARE EDGE)
-   * Jadwal:
+   * Jadwal 7 Hari:
    * - 0 12 * * * = 12:00 UTC (19:00 WIB) -> Pengingat Santai
    * - 0 13 * * * = 13:00 UTC (20:00 WIB) -> Pengingat Keras
    * - 0 14 * * * = 14:00 UTC (21:00 WIB) -> Auto Monev Cadangan
@@ -119,23 +119,37 @@ export default {
     const cron = event.cron;
     const now = new Date();
     const hourUtc = now.getUTCHours();
+    const vercelHost = (env && env.VERCEL_DOMAIN) ? env.VERCEL_DOMAIN.replace(/\/+$/, "") : "https://monev-wine.vercel.app";
+    const cronSecret = (env && env.CRON_SECRET) ? env.CRON_SECRET.trim() : "";
 
-    let targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=auto";
-
+    let path = "";
     if (cron === "0 12 * * *" || hourUtc === 12) {
-      targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=reminder&mode=santai";
+      path = "/api/cron?type=reminder&mode=santai";
     } else if (cron === "0 13 * * *" || hourUtc === 13) {
-      targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=reminder&mode=keras";
+      path = "/api/cron?type=reminder&mode=keras";
     } else if (cron === "0 14 * * *" || hourUtc === 14) {
-      targetEndpoint = "https://monev-wine.vercel.app/api/cron?type=auto";
+      path = "/api/cron?type=auto";
+    } else {
+      console.log(`[CF Cron Idle] Scheduled trigger pada jam ${hourUtc} UTC di luar jadwal (12, 13, 14 UTC). Tidak ada request yang dikirim.`);
+      return;
+    }
+
+    if (cronSecret && path.includes("type=auto")) {
+      path += `&secret=${encodeURIComponent(cronSecret)}`;
+    }
+
+    const targetEndpoint = `${vercelHost}${path}`;
+    const reqHeaders = {
+      "User-Agent": "Cloudflare-Worker-Cron/1.0"
+    };
+    if (cronSecret) {
+      reqHeaders["Authorization"] = `Bearer ${cronSecret}`;
     }
 
     ctx.waitUntil(
       fetch(targetEndpoint, {
         method: "GET",
-        headers: {
-          "User-Agent": "Cloudflare-Worker-Cron/1.0"
-        }
+        headers: reqHeaders
       }).then(async (res) => {
         const body = await res.text();
         console.log(`[CF Cron Success] ${targetEndpoint} -> HTTP ${res.status}: ${body}`);

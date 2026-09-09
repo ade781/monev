@@ -12,3 +12,6 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Cloudflare Wrangler cache
+.wrangler/

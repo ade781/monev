@@ -4,19 +4,5 @@
     "api/**/*.py": {
       "maxDuration": 60
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron?type=reminder&mode=santai",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron?type=reminder&mode=keras",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron?type=auto",
-      "schedule": "0 14 * * *"
-    }
-  ]
+  }
 }
