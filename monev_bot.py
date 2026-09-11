@@ -769,7 +769,7 @@ def main(force=False, notify_telegram=False):
         token = login_kemnaker()
         sudah, data_absen = periksa_absen_hari_ini(token, today_str)
         if sudah and not force:
-            msg = "monev sudah diisii"
+            msg = "✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang."
             if notify_telegram:
                 kirim_telegram(msg)
             return {"status": "already_submitted", "date": today_str, "message": msg}

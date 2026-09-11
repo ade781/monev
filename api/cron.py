@@ -4,6 +4,7 @@ import urllib.parse
 import json
 import sys
 import os
+import tempfile
 from datetime import datetime
 
 # Tambahkan direktori root agar bisa import monev_bot
@@ -20,7 +21,8 @@ _PENDING_ACTIVITY = {}
 def _set_pending(chat_id, text):
     _PENDING_ACTIVITY[str(chat_id)] = text
     try:
-        with open(os.path.join("/tmp", f"pending_{chat_id}.txt"), "w", encoding="utf-8") as f:
+        p = os.path.join(tempfile.gettempdir(), f"monev_pending_{chat_id}.txt")
+        with open(p, "w", encoding="utf-8") as f:
             f.write(text)
     except Exception:
         pass
@@ -29,7 +31,7 @@ def _get_pending(chat_id):
     cid = str(chat_id)
     text = _PENDING_ACTIVITY.pop(cid, None)
     if not text:
-        p = os.path.join("/tmp", f"pending_{chat_id}.txt")
+        p = os.path.join(tempfile.gettempdir(), f"monev_pending_{chat_id}.txt")
         try:
             if os.path.exists(p):
                 with open(p, "r", encoding="utf-8") as f:
@@ -125,7 +127,7 @@ def handle_telegram_command(chat_id, text):
 
         diag = monev_bot.periksa_koneksi_dan_status()
         if diag.get("success") and diag.get("sudah_absen"):
-            return ("monev sudah diisii", monev_bot.MENU_KEYBOARD)
+            return ("✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang.", monev_bot.MENU_KEYBOARD)
 
         try:
             res = monev_bot.submit_monev(custom_activity=kegiatan)
@@ -172,7 +174,7 @@ def handle_telegram_command(chat_id, text):
 
         diag = monev_bot.periksa_koneksi_dan_status()
         if diag.get("success") and diag.get("sudah_absen"):
-            return ("monev sudah diisii", monev_bot.MENU_KEYBOARD)
+            return ("✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang.", monev_bot.MENU_KEYBOARD)
 
         _set_pending(chat_id, kegiatan)
         today_wib = datetime.now(monev_bot.WIB)
@@ -291,7 +293,7 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(b'{"status": "ok"}')
 
         except Exception as e:
-            print(f"[Webhook Error] {e}")
+            print(f"[Webhook Error] {e}", flush=True)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -435,7 +437,7 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"status": "success", "cron_result": res}).encode("utf-8"))
             return
 
-        # 6. Default GET (Safe: Halaman info status)
+        # 7. Default GET (Safe: Halaman info status)
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
