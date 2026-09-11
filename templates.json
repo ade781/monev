@@ -1,26 +1,5 @@
 [
   {
-    "id": 1,
-    "category": "coding_qr",
-    "activity": "Melanjutkan pengembangan dan optimasi modul pemindai QR Code pada aplikasi web pelaporan inspeksi ARFF (Airport Rescue and Fire Fighting) YIA. Melakukan penyempurnaan library scanner berbasis HTML5 kamera dengan menerapkan konfigurasi resolusi dinamis serta penyesuaian autofocus kamera smartphone. Selain itu, menambahkan mekanisme debouncing pada pemrosesan stream video untuk memastikan pembacaan kode identifikasi pada tabung APAR berjalan instan, presisi, dan tidak memicu panggilan API ganda ke server backend.",
-    "learning": "Mempelajari optimasi rendering canvas video stream pada perangkat mobile dengan spesifikasi terbatas, penanganan siklus hidup stream kamera di browser, serta pencegahan race conditions saat data barcode berhasil terbaca berturut-turut.",
-    "obstacles": "Pencahayaan yang minim pada beberapa titik penempatan tabung APAR di sudut gedung operasional sempat memperlambat proses pemindaian kamera. Masalah ini diatasi dengan menambahkan fitur saklar toggle lampu senter (flashlight torch API) dan opsi input manual nomor register tabung sebagai fallback darurat."
-  },
-  {
-    "id": 2,
-    "category": "field_test",
-    "activity": "Melaksanakan uji coba fungsionalitas dan kelayakan aplikasi pelaporan ARFF secara langsung di lapangan bersama rekan magang Habib di area operasional Yogyakarta International Airport (YIA). Melakukan simulasi alur kerja inspeksi fisik tabung APAR mulai dari pemindaian stiker QR Code pada tabung, pengisian form checklist kelayakan (tekanan barometer, segel pin, selang nozzle, kondisi fisik tabung), hingga proses sinkronisasi dan penyimpanan data ke server secara real-time.",
-    "learning": "Memahami alur kerja nyata para personel inspeksi keselamatan bandara di lapangan, dinamika mobilitas petugas, serta pentingnya mendesain alur antarmuka aplikasi yang cepat, efisien, dan tidak membebani durasi kerja tim operasional.",
-    "obstacles": "Sinyal koneksi internet di beberapa titik gedung terminal bandara dan area terisolasi sempat mengalami fluktuasi yang menyebabkan submit data terhambat. Dari temuan ini, dirumuskan arsitektur penyimpanan sementara berbasis IndexedDB/LocalStorage agar data tetap tersimpan saat offline dan tersinkronisasi otomatis saat kembali online."
-  },
-  {
-    "id": 3,
-    "category": "coordination",
-    "activity": "Menghadiri sesi koordinasi dan evaluasi progres mingguan bersama mentor unit kerja, Bapak Ananta, di area kantor operasional Graha Angkasa Pura YIA. Mendemonstrasikan purwarupa (prototype) aplikasi pelaporan ARFF yang telah terintegrasi dengan pemindai QR Code, memaparkan struktur relasi database riwayat inspeksi, serta mendengarkan evaluasi menyeluruh terkait kebutuhan penyesuaian formulir dan hak akses otorisasi petugas.",
-    "learning": "Memperoleh pemahaman mendalam terkait regulasi standar pelaporan keselamatan penerbangan (KP Kemhub / standar keselamatan bandara), pentingnya kepatuhan SOP internal Angkasa Pura, serta seni menyelaraskan terminologi teknis rekayasa perangkat lunak dengan kebutuhan pengguna non-IT di unit operasional.",
-    "obstacles": "Diskusi berjalan secara interaktif dan konstruktif. Seluruh masukan mengenai penyederhanaan opsi pilihan pada form checklist berhasil dirangkum secara sistematis ke dalam dokumen backlog perbaikan fitur untuk iterasi pengembangan berikutnya."
-  },
-  {
     "id": 4,
     "category": "backend_api",
     "activity": "Merancang, membangun, dan menguji endpoint RESTful API baru pada backend Express.js untuk memfasilitasi pencarian dan pemfilteran data riwayat inspeksi tabung APAR. Menerapkan arsitektur controller-service yang rapi serta menyusun query pencarian multi-parameter berdasarkan nomor register tabung, zona lokasi terminal, status kelayakan (layak/rusak), dan rentang tanggal pelaksanaan inspeksi harian.",
@@ -243,5 +222,61 @@
     "activity": "Melakukan pengecekan menyeluruh, pengujian kesiapan redundansi sistem (failover readiness check), serta verifikasi integritas data transaksi harian pada aplikasi pelaporan ARFF dan bot notifikasi Telegram pendukung. Memastikan seluruh fungsi otomatisasi penjadwalan, sinkronisasi token autentikasi SSO, serta mekanisme jaring pengaman presensi cadangan berada dalam kondisi prima untuk menjaga keandalan operasional secara berkelanjutan.",
     "learning": "Memahami arsitektur sistem dengan toleransi kesalahan tinggi (High Availability & Fault Tolerance), strategi mitigasi kegagalan jaringan eksternal, serta pentingnya pengujian kesehatan sistem secara berkala demi menjamin keandalan data keselamatan bandara.",
     "obstacles": "Seluruh pemeriksaan diagnostik kesehatan sistem, validasi koneksi SSO, dan mekanisme pengawasan otomatis berjalan dengan hasil sempurna, siap mendukung kelancaran operasional magang di lingkungan Angkasa Pura YIA."
+  },
+  {
+    "id": 36,
+    "category": "pwa_offline",
+    "activity": "Mengimplementasikan fitur Progressive Web App (PWA) dengan Service Worker dan Cache Storage API pada aplikasi inspeksi ARFF YIA. Melakukan konfigurasi web app manifest dan strategi caching Network First with Offline Fallback agar petugas ARFF tetap dapat membuka formulir checklist inspeksi tabung APAR dan menyimpan data inspeksi secara lokal di IndexedDB saat berada di area apron atau bunker bandara yang minim sinyal internet.",
+    "learning": "Memahami arsitektur Service Worker, siklus hidup instalasi dan aktivasi worker, manajemen offline persistence dengan IndexedDB, serta strategi sinkronisasi data background (Background Sync API) saat koneksi internet pulih.",
+    "obstacles": "Cache Service Worker sempat menyimpan versi lama file JavaScript aplikasi sehingga pembaruan UI tidak langsung terlihat. Masalah ini diatasi dengan menerapkan versioning pada nama cache dan menambahkan mekanisme skipWaiting() otomatis pada prompt update."
+  },
+  {
+    "id": 37,
+    "category": "data_analytics",
+    "activity": "Merancang dan membangun komponen widget visualisasi data analitik pada dashboard utama ARFF YIA menggunakan Chart.js/Recharts. Menampilkan grafik tren tingkat kepatuhan inspeksi bulanan, diagram distribusi jenis kerusakan APAR (penurunan tekanan barometer, segel putus, korosi tabung, selang getas), serta peta sebaran titik penempatan tabung yang paling sering memerlukan pergantian media pemadam di area terminal bandara.",
+    "learning": "Mendalami agregasi data analitik pada backend menggunakan SQL GROUP BY & aggregate functions, visualisasi data interaktif yang informatif bagi pengambil keputusan keselamatan penerbangan, serta penyusunan metrik performa operasional (KPI).",
+    "obstacles": "Query agregasi data untuk grafik tahunan sempat membebani response time server backend. Kendala ini diselesaikan dengan membuat materialized view ringkasan bulanan dan menerapkan in-memory caching pada endpoint analitik."
+  },
+  {
+    "id": 38,
+    "category": "field_test",
+    "activity": "Melakukan pengujian lapangan simulasi kondisi tanpa internet (offline test) bersama rekan magang Habib di area sisi udara (airside) dan pos perimeter ARFF YIA. Menguji keandalan sistem saat petugas melakukan input 15 checklist inspeksi tabung APAR dalam mode pesawat (airplane mode), lalu memverifikasi kelancaran proses sinkronisasi antrean data (queue batch sync) ke server ketika perangkat kembali terhubung ke jaringan Wi-Fi operasional bandara.",
+    "learning": "Memahami tantangan konektivitas nyata di fasilitas bandar udara internasional, mekanisme resolusi konflik data (conflict resolution timestamps) saat multi-device submit data bersamaan, serta pentingnya indikator visual status sinkronisasi bagi pengguna lapangan.",
+    "obstacles": "Terdapat dua data inspeksi pada tabung yang sama yang disubmit hampir bersamaan dengan selisih detik saat sync berjalan. Masalah diselesaikan dengan menerapkan validasi unique constraint kombinasi tanggal inspeksi dan ID tabung serta strategi data merging berbasis timestamp terbaru."
+  },
+  {
+    "id": 39,
+    "category": "security_audit",
+    "activity": "Melaksanakan evaluasi keamanan perangkat lunak (security hardening) pada seluruh endpoint API sistem ARFF YIA. Menerapkan middleware rate limiter untuk mencegah serangan brute-force dan DoS, memperketat konfigurasi CORS (Cross-Origin Resource Sharing), mengimplementasikan library Helmet.js untuk HTTP security headers, serta memvalidasi sanitasi input formulir dari risiko celah Cross-Site Scripting (XSS) dan SQL Injection.",
+    "learning": "Memahami standar keamanan OWASP Top 10 pada aplikasi web enterprise instansi vital transportasi, teknik enkripsi data sensitif dalam transit (HTTPS/TLS) dan at-rest, serta perancangan kebijakan otorisasi API berbasis token JWT yang aman.",
+    "obstacles": "Penerapan Content Security Policy (CSP) yang terlalu ketat sempat memblokir eksekusi library kamera QR Code scanner dan pemanggilan icon font. Kendala ini diselesaikan dengan menata whitelist directive CSP secara spesifik untuk origin domain dan media stream yang diizinkan."
+  },
+  {
+    "id": 40,
+    "category": "coordination",
+    "activity": "Menghadiri agenda presentasi dan demo fitur operasional aplikasi sistem pelaporan inspeksi ARFF bersama mentor Bapak Ananta dan perwakilan supervisor regu pemadam ARFF YIA di Graha Angkasa Pura. Memperagakan alur lengkap dari login petugas, pemindaian QR Code tabung, pelaporan temuan kerusakan darurat, hingga notifikasi otomatis ke tim logistik dan pencetakan berita acara inspeksi.",
+    "learning": "Meningkatkan kemampuan komunikasi publik dan presentasi teknis di hadapan pemangku kepentingan (stakeholders) operasional bandara, mengelola sesi tanya-jawab dengan lugas, serta menyaring feedback konstruktif untuk penyempurnaan aplikasi sebelum tahap deployment final.",
+    "obstacles": "Pihak supervisor meminta penambahan field catatan khusus untuk jenis tabung beroda (Wheeled Fire Extinguisher) yang memiliki spesifikasi berbeda dengan tabung jinjing (Portable). Permintaan ini dicatat dan segera ditambahkan ke skema formulir dinamis."
+  },
+  {
+    "id": 41,
+    "category": "geofencing_validation",
+    "activity": "Mengembangkan modul validasi koordinat geografis (Geofencing & Proximity Check) menggunakan Geolocation API dan rumus Haversine pada sistem pelaporan inspeksi ARFF YIA. Memastikan bahwa laporan inspeksi tabung hanya dapat disubmit apabila koordinat GPS perangkat petugas berada dalam radius wajar (maksimal 50 meter) dari titik koordinat resmi penempatan tabung APAR di denah bandara guna menjamin validitas pemeriksaan fisik nyata.",
+    "learning": "Mempelajari kalkulasi jarak geospasial menggunakan formula Haversine matematika, akurasi GPS mobile pada area tertutup (indoor positioning vs outdoor), serta integrasi data geolokasi ke dalam log audit kepatuhan inspeksi.",
+    "obstacles": "Sinyal GPS di dalam gedung terminal lantai dasar kadang mengalami degradasi akurasi hingga margin error lebih dari 60 meter. Masalah ini diatasi dengan menerapkan toleransi akurasi bertingkat dan mengizinkan input alasan teknis yang diverifikasi supervisor jika GPS melampaui batas radius."
+  },
+  {
+    "id": 42,
+    "category": "bulk_management",
+    "activity": "Membangun fitur generator dan cetak massal (batch printing) label stiker QR Code untuk inventaris tabung APAR ARFF YIA. Menyusun layout stiker siap cetak berbasis format grid PDF (menggunakan PDFKit/jsPDF) yang memuat kode QR beresolusi tinggi, logo identitas bandara, nomor registrasi aset, jenis media pemadam, dan tanggal kadaluwarsa yang siap ditempelkan langsung pada fisik tabung di lapangan.",
+    "learning": "Mendalami perancangan tata letak cetak presisi (print media styling & vector PDF rendering), penanganan kalkulasi dimensi milimeter ke piksel cetak standar industri label, serta pengelompokan data dalam batch processing yang efisien.",
+    "obstacles": "Ukuran file PDF hasil generate sempat membengkak signifikan ketika mencetak ratusan stiker sekaligus karena resolusi gambar logo. Masalah diselesaikan dengan mengoptimalkan kompresi vektor gambar dan menggunakan metode streaming response pada backend."
+  },
+  {
+    "id": 43,
+    "category": "user_acceptance_testing",
+    "activity": "Mendampingi pelaksanaan sesi UAT (User Acceptance Testing) aplikasi pelaporan inspeksi ARFF bersama personel regu pemadam kebakaran bandara YIA. Memandu petugas mencoba seluruh skenario penggunaan mandiri tanpa intervensi teknis, mencatat waktu rata-rata pengisian checklist per tabung, mendokumentasikan respon kemudahan penggunaan formulir, serta merekap lembar kuesioner System Usability Scale (SUS).",
+    "learning": "Memahami metodologi evaluasi pengalaman pengguna (UX research & usability testing), analisis skor kepuasan SUS pada aplikasi operasional internal perusahaan, serta teknik observasi perilaku pengguna dalam mengadopsi sistem digital baru.",
+    "obstacles": "Beberapa petugas senior sempat terbiasa dengan metode centang kertas lama dan memerlukan sedikit waktu adaptasi dalam navigasi menu aplikasi. Dengan panduan singkat yang ramah dan antarmuka yang intuitif, petugas dapat menyelesaikan pengujian inspeksi secara mandiri dengan lancar."
   }
 ]

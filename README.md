@@ -101,7 +101,7 @@ Seluruh waktu operasional disinkronkan dengan zona Waktu Indonesia Barat (WIB, U
 - **Zero External Dependencies**: Menggunakan pustaka standar Python bawaan (`urllib`, `http.cookiejar`, `json`, `os`, `time`, `random`) tanpa memerlukan instalasi modul pihak ketiga.
 - **Autentikasi SSO Otomatis & Caching Token**: Mendukung siklus login SSO SIAPkerja multi-langkah (validasi cookie, token CSRF, dan callback handshake) disertai penyimpanan cache token lokal dengan batas waktu aktif (TTL) hingga 5.5 jam.
 - **Validasi Kehadiran Mandiri (Guard Check)**: Sistem selalu memverifikasi status presensi di server Kemnaker terlebih dahulu. Apabila data kehadiran hari bersangkutan sudah berstatus `PRESENT`, sistem tidak akan melakukan penimpaan data.
-- **Koleksi Template Kegiatan Non-Duplikasi**: Dilengkapi 35 variasi template logbook aktivitas harian. Setiap template yang telah digunakan dicatat ke dalam `used_templates.json` sehingga tidak terjadi pengulangan kegiatan.
+- **Koleksi Template Kegiatan Non-Duplikasi**: Dilengkapi 40 variasi template logbook aktivitas harian. Setiap template yang telah digunakan dicatat ke dalam `used_templates.json` sehingga tidak terjadi pengulangan kegiatan.
 - **Simulasi Deviasi Koordinat (GPS Jittering)**: Koordinat presensi diberi deviasi mikro natural secara acak (rentang 10 hingga 25 meter) agar posisi presensi tidak terdeteksi sebagai koordinat statis.
 - **Mekanisme Debounce (15 Menit)**: Mencegah eksekusi ganda apabila terjadi pemicuan berulang dalam interval waktu yang berdekatan.
 - **Dukungan Akhir Pekan (Weekend Awareness)**: Pengingat otomatis memberikan label penyesuaian khusus pada hari libur (Sabtu dan Minggu).
