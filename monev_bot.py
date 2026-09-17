@@ -255,6 +255,52 @@ def kirim_telegram(pesan, chat_id=None, reply_markup=None):
         print(f"[Telegram Error] {e}", flush=True)
         return False
 
+def edit_pesan_telegram(chat_id, message_id, text=None, reply_markup=None):
+    """Mengubah isi teks atau reply markup dari pesan Telegram yang sudah terkirim (misal menghapus tombol setelah diklik)"""
+    target_chat = str(chat_id).strip() if chat_id else (TELEGRAM_CHAT_ID.strip() if TELEGRAM_CHAT_ID else None)
+    if not TELEGRAM_BOT_TOKEN or not target_chat or not message_id:
+        return False
+
+    clean_token = TELEGRAM_BOT_TOKEN.strip()
+    if clean_token.lower().startswith("bot"):
+        clean_token = clean_token[3:]
+
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        if text is not None:
+            payload = {
+                "chat_id": target_chat,
+                "message_id": message_id,
+                "text": text,
+                "parse_mode": "Markdown"
+            }
+            if reply_markup is not None:
+                payload["reply_markup"] = reply_markup
+            req = urllib.request.Request(
+                f"https://api.telegram.org/bot{clean_token}/editMessageText",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with opener.open(req, timeout=10):
+                return True
+        elif reply_markup is not None:
+            payload = {
+                "chat_id": target_chat,
+                "message_id": message_id,
+                "reply_markup": reply_markup
+            }
+            req = urllib.request.Request(
+                f"https://api.telegram.org/bot{clean_token}/editMessageReplyMarkup",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with opener.open(req, timeout=10):
+                return True
+    except Exception as e:
+        print(f"[Telegram Edit Notice] {e}", flush=True)
+        return False
+    return False
+
 # 3. Autentikasi SSO Kemnaker
 def login_kemnaker(force_refresh=False):
     global _CACHED_TOKEN, _CACHED_TOKEN_TIME
@@ -477,10 +523,10 @@ def ambil_riwayat_terpakai(token=None):
         if act:
             used_snippets.add(act[:80])
 
-    # 2. Verifikasi silang dengan riwayat daily-logs dari Kemnaker
+    # 2. Verifikasi silang dengan riwayat daily-logs dari Kemnaker (dengan pagination limit)
     if token:
         try:
-            logs = api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/daily-logs", token).get("data", [])
+            logs = api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/daily-logs?limit=100&page=1", token).get("data", [])
             for item in logs:
                 act = str(item.get("activity_log", "")).strip().lower()
                 if act:
@@ -626,10 +672,21 @@ def muat_template_pengingat():
     if _REMINDER_TEMPLATES is None:
         p = os.path.join(os.path.dirname(__file__), "reminder_templates.json")
         _REMINDER_TEMPLATES = json.load(open(p, "r", encoding="utf-8")) if os.path.exists(p) else {
-            "santai_19": ["☕ Halo Mas Ade! Santai sejenak yuk, jangan lupa isi presensi monev hari ini ya~"],
-            "keras_20": ["🚨 WOI MAS ADE! Jam 8 malam ini cuy! Buruan isi monev sebelum kena amuk Kemnaker!"]
+            "pagi_09": ["🌅 Selamat pagi Mas Ade! Sistem monitoring aktif memantau hari magangmu."],
+            "sore_15": ["🌤️ Selamat sore Mas Ade! Jam 3 sore saatnya laporan dan auto-monev."],
+            "sore_18": ["🌤️ Halo Mas Ade! Cek presensi monev jam 6 sore nih, yuk pastikan aman~"],
+            "malam_21": ["🌙 Selamat malam Mas Ade! Evaluasi presensi monev jam 9 malam."]
         }
     return _REMINDER_TEMPLATES
+
+def extract_activity_snippet(text, max_words=12):
+    """Mengambil sekitar 8-12 kata pertama dari kegiatan logbook."""
+    if not text:
+        return ""
+    words = str(text).strip().split()
+    if len(words) <= max_words:
+        return " ".join(words)
+    return " ".join(words[:max_words]) + "..."
 
 def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
     today_wib = datetime.now(WIB)
@@ -644,15 +701,15 @@ def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
         print(f"[Pengingat] Status presensi tidak dapat dicek ({e}), tetap kirim pengingat.", flush=True)
 
     temps = muat_template_pengingat()
-    is_keras = force_mode == "keras" or (force_mode is None and today_wib.hour >= 20)
-    daftar = temps.get("keras_20" if is_keras else "santai_19", [])
-    salam_random = random.choice(daftar) if daftar else "Halo Mas Ade, jangan lupa isi monev hari ini ya!"
+    is_malam = force_mode == "malam" or (force_mode is None and today_wib.hour >= 20)
+    daftar = temps.get("malam_21" if is_malam else "sore_18", [])
+    salam_random = random.choice(daftar) if daftar else "Halo Mas Ade, jangan lupa cek monev hari ini ya!"
     catatan_weekend = "\n🏖️ _Catatan: Jika hari ini Anda libur magang/tidak ada shift, silakan abaikan pengingat ini._\n" if is_weekend else ""
 
     pesan = (
         f"{salam_random}\n\n"
-        f"_{('🔥 PENGINGAT KERAS JAM 20:00 WIB' if is_keras else '☕ PENGINGAT SANTAI JAM 19:00 WIB')}_\n"
-        f"⏰ *Batas Waktu Mandiri:* Sebelum 21:00 WIB{catatan_weekend}\n"
+        f"_{('🌙 EVALUASI MALAM JAM 21:00 WIB' if is_malam else '🌤️ CEK STATUS SORE JAM 18:00 WIB')}_\n"
+        f"⏰ *Jadwal Presensi:* Mandiri atau Auto-Monev Jam 15:00 WIB{catatan_weekend}\n"
         "💡 _Ketik `/isi <kegiatan>` atau klik tombol di bawah._"
     )
     kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
@@ -661,20 +718,55 @@ def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
 kirim_pengingat_sore = kirim_pengingat_monev
 
 def kirim_status_harian(waktu_label=None, chat_id=None):
-    """Mengirim laporan status presensi & heartbeat kesehatan sistem di jam 09:00 WIB dan 15:00 WIB"""
+    """
+    Mengirim laporan status presensi & monitoring sistem harian:
+    - 09:00 WIB ("pagi"): Monitoring pagi & cek kesehatan SSO / proxy.
+    - 18:00 WIB ("sore"): Cek apakah sudah monev. Jika belum (misal jam 15:00 gagal), otomatis auto-retry!
+    - 21:00 WIB ("malam"): Cek apakah sudah monev + cuplikan kegiatan (8-12 kata). Jika belum, otomatis auto-retry & peringatan darurat!
+    """
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
     jam_str = today_wib.strftime("%H:%M:%S")
     is_weekend = today_wib.weekday() >= 5
 
-    is_pagi = waktu_label == "pagi" or (waktu_label is None and today_wib.hour < 12)
+    if waktu_label:
+        w_norm = str(waktu_label).lower().strip()
+    else:
+        h = today_wib.hour
+        if h < 12:
+            w_norm = "pagi"
+        elif h < 20:
+            w_norm = "sore"
+        else:
+            w_norm = "malam"
+
+    is_pagi = w_norm == "pagi"
+    is_sore = w_norm == "sore"
+    is_malam = w_norm == "malam"
+
     weekend_badge = " 🏖️ [AKHIR PEKAN]" if is_weekend else ""
-    waktu_title = f"{'PAGI (09:00 WIB)' if is_pagi else 'SORE (15:00 WIB)'}{weekend_badge}"
-    icon_waktu = "🌅" if is_pagi else "🌤️"
+    if is_pagi:
+        waktu_title = f"PAGI (09:00 WIB){weekend_badge}"
+        icon_waktu = "🌅"
+    elif is_sore:
+        waktu_title = f"SORE (18:00 WIB){weekend_badge}"
+        icon_waktu = "🌤️"
+    else:
+        waktu_title = f"MALAM (21:00 WIB){weekend_badge}"
+        icon_waktu = "🌙"
 
     temps = muat_template_pengingat()
-    salam_list = temps.get("pagi_09" if is_pagi else "sore_15", [])
-    salam_text = random.choice(salam_list) if salam_list else ("Selamat pagi Mas Ade!" if is_pagi else "Selamat sore Mas Ade!")
+    if is_pagi:
+        salam_list = temps.get("pagi_09", [])
+        default_salam = "Selamat pagi Mas Ade!"
+    elif is_sore:
+        salam_list = temps.get("sore_18", [])
+        default_salam = "Selamat sore Mas Ade!"
+    else:
+        salam_list = temps.get("malam_21", [])
+        default_salam = "Selamat malam Mas Ade!"
+
+    salam_text = random.choice(salam_list) if salam_list else default_salam
 
     diag = periksa_koneksi_dan_status()
     cf = os.getenv("CLOUDFLARE_WORKER_URL", "").strip()
@@ -694,46 +786,117 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
         kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
         return {"status": "error", "message": diag.get("error")}
 
+    user_name = safe_markdown(diag.get("user_name", "Mas Ade"))
     sisa, total = hitung_sisa_template(token=_CACHED_TOKEN)
 
-    act = ""
-    user_name = safe_markdown(diag.get("user_name", "Mas Ade"))
+    # 1. KONDISI SUDAH ABSEN
     if diag.get("sudah_absen"):
         dt = diag.get("data_absen") or {}
         app_st = dt.get("approval_status", "SUBMITTED")
         jam_absen = f"jam {dt['created_at'].split('T')[1][:8]} WIB" if "T" in dt.get("created_at", "") else "Tercatat"
-        act_clean = safe_markdown(diag.get("activity_text", ""), max_len=280)
-        if act_clean:
-            act = f"📝 *Kegiatan Terdata:*\n_{act_clean}_\n\n"
-        status_line = (
-            f"✅ *SUDAH TERISI (PRESENT)*\n"
-            f"⏱️ *Waktu Submit:* `{jam_absen}`\n"
-            f"📋 *Persetujuan Mentor:* `{app_st}`"
-        )
-        footer = "✨ _Presensi hari ini sudah aman dan tercatat di Kemnaker._"
-    else:
-        status_line = (
-            "⚠️ *BELUM TERISI*\n"
-            "💡 _Belum ada presensi untuk hari ini. Jangan lupa diisi sebelum batas malam ya!_"
-        )
-        footer = "👉 _Klik tombol di bawah atau ketik `/isi <kegiatan>` untuk mengisi laporan hari ini._"
+        act_raw = diag.get("activity_text", "")
 
-    pesan = (
-        f"{salam_text}\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"{icon_waktu} *MONITORING MONEV & SISTEM ({waktu_title})*\n\n"
-        "🤖 *Status Sistem & Trigger:* ✅ *Aktif & Berfungsi Normal*\n"
-        f"🌐 *Jalur Proxy:* `{proxy_st}` | 🔐 *SSO Kemnaker:* `Terhubung`\n"
-        f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
-        f"👤 *Peserta:* `{user_name}`\n\n"
-        f"📊 *Status Presensi Hari Ini:*\n{status_line}\n\n"
-        f"{act}"
-        f"📦 *Stok Template Cadangan:* `{sisa} dari {total} template`\n\n"
-        f"{footer}"
-    )
+        if is_malam:
+            # Jam 21:00 malam: Tampilkan status + cuplikan kegiatan (8-12 kata)
+            snippet = extract_activity_snippet(act_raw, max_words=12)
+            snippet_clean = safe_markdown(snippet)
+            preview_sec = f"📝 *Cuplikan Kegiatan:*\n_{snippet_clean}_\n\n" if snippet_clean else ""
+            pesan = (
+                f"{salam_text}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"{icon_waktu} *MONITORING MONEV MALAM ({waktu_title})*\n\n"
+                "🤖 *Status Sistem & Trigger:* ✅ *Aktif & Berfungsi Normal*\n"
+                f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+                f"👤 *Peserta:* `{user_name}`\n\n"
+                f"📊 *Status Presensi Hari Ini:*\n"
+                f"✅ *SUDAH TERISI (PRESENT)*\n"
+                f"⏱️ *Waktu Submit:* `{jam_absen}`\n"
+                f"📋 *Persetujuan Mentor:* `{app_st}`\n\n"
+                f"{preview_sec}"
+                f"📦 *Stok Template Cadangan:* `{sisa} dari {total} template`\n\n"
+                "✨ _Laporan monev dan kehadiran hari ini telah selesai dan aman! Selamat beristirahat._"
+            )
+        else:
+            act_clean = safe_markdown(act_raw, max_len=280)
+            act_sec = f"📝 *Kegiatan Terdata:*\n_{act_clean}_\n\n" if act_clean else ""
+            pesan = (
+                f"{salam_text}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"{icon_waktu} *MONITORING MONEV & SISTEM ({waktu_title})*\n\n"
+                "🤖 *Status Sistem & Trigger:* ✅ *Aktif & Berfungsi Normal*\n"
+                f"🌐 *Jalur Proxy:* `{proxy_st}` | 🔐 *SSO Kemnaker:* `Terhubung`\n"
+                f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+                f"👤 *Peserta:* `{user_name}`\n\n"
+                f"📊 *Status Presensi Hari Ini:*\n"
+                f"✅ *SUDAH TERISI (PRESENT)*\n"
+                f"⏱️ *Waktu Submit:* `{jam_absen}`\n"
+                f"📋 *Persetujuan Mentor:* `{app_st}`\n\n"
+                f"{act_sec}"
+                f"📦 *Stok Template Cadangan:* `{sisa} dari {total} template`\n\n"
+                "✨ _Presensi hari ini sudah aman dan tercatat di Kemnaker._"
+            )
 
-    kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
-    return {"status": "success", "sudah_absen": diag.get("sudah_absen"), "message": "Notifikasi status harian terkirim"}
+        kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
+        return {"status": "success", "sudah_absen": True, "message": f"Status {w_norm} terkirim (sudah monev)"}
+
+    # 2. KONDISI BELUM ABSEN
+    if is_pagi:
+        pesan = (
+            f"{salam_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{icon_waktu} *MONITORING MONEV PAGI ({waktu_title})*\n\n"
+            "🤖 *Status Sistem & Trigger:* ✅ *Aktif & Berfungsi Normal*\n"
+            f"🌐 *Jalur Proxy:* `{proxy_st}` | 🔐 *SSO Kemnaker:* `Terhubung`\n"
+            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+            f"👤 *Peserta:* `{user_name}`\n\n"
+            "📊 *Status Presensi Hari Ini:*\n"
+            "⏳ *BELUM TERISI (NORMAL)*\n"
+            "⚡ _Auto-Monev dijadwalkan otomatis berjalan pada pukul 15:00 WIB (Jam 3 Sore)._\n\n"
+            f"📦 *Stok Template Cadangan:* `{sisa} dari {total} template`\n\n"
+            "👉 _Jika ingin mengisi sekarang lebih awal, klik tombol di bawah atau ketik `/isi <kegiatan>`._"
+        )
+        kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
+        return {"status": "success", "sudah_absen": False, "message": "Status pagi terkirim (menunggu jadwal 15:00)"}
+
+    # Jam 18:00 WIB (Sore) atau Jam 21:00 WIB (Malam) dan belum monev -> AUTO-RETRY SUBMIT SEKARANG!
+    print(f"[Status {w_norm.upper()}] Presensi {today_str} masih kosong. Memulai auto-retry pengisian monev...", flush=True)
+    try:
+        retry_res = main(force=False, notify_telegram=False)
+        diag_after = periksa_koneksi_dan_status()
+        act_text = diag_after.get("activity_text") or (retry_res.get("template") or {}).get("activity", "")
+        snippet = extract_activity_snippet(act_text, max_words=12)
+        snippet_clean = safe_markdown(snippet)
+
+        sisa_now, total_now = hitung_sisa_template(token=_CACHED_TOKEN)
+        pesan = (
+            f"{salam_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{icon_waktu} *MONITORING & AUTO-RETRY ({waktu_title})*\n\n"
+            "⚠️ *Perhatian:* Presensi hari ini sebelumnya belum terisi (kemungkinan gagal di jam 15:00).\n"
+            "🔄 *Sistem telah melakukan Auto-Retry pengisian dan BERHASIL!* 🎉\n\n"
+            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+            f"👤 *Peserta:* `{user_name}`\n"
+            f"✅ *Status Presensi:* `PRESENT`\n"
+            f"📝 *Cuplikan Kegiatan:* _{snippet_clean}_\n"
+            f"📦 *Sisa Stok Template:* `{sisa_now} dari {total_now} template`\n\n"
+            "✨ _Laporan presensi dan logbook hari ini telah berhasil diselamatkan ke Kemnaker!_"
+        )
+        kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
+        return {"status": "retry_success", "sudah_absen": True, "message": f"Auto-retry jam {w_norm} berhasil"}
+
+    except Exception as retry_err:
+        err_msg = safe_markdown(str(retry_err), max_len=200)
+        pesan = (
+            f"🚨 *PERINGATAN DARURAT: MONEV BELUM TERISI ({waktu_title})*\n\n"
+            f"⚠️ *Halo {user_name}! Mohon Perhatian Segera!*\n"
+            f"Presensi Monev hari ini (`{today_str}`) masih *KOSONG*.\n"
+            f"Sistem otomatis telah mencoba melakukan auto-retry pada {jam_str} WIB, namun gagal:\n"
+            f"❌ *Detail Kendala:* `{err_msg}`\n\n"
+            "👇 _Mohon segera lakukan pengisian manual sekarang sebelum batas hari berakhir!_\n"
+            "Klik tombol *⚡ Eksekusi Monev* di bawah atau ketik `/isi <kegiatan>`."
+        )
+        kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
+        return {"status": "retry_failed", "sudah_absen": False, "error": str(retry_err)}
 
 def ambil_rekap_mingguan():
     try:
@@ -763,6 +926,7 @@ def main(force=False, notify_telegram=False):
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
     jam_str = today_wib.strftime("%H:%M:%S")
+    jam_label = today_wib.strftime("%H:%M")
 
     print(f"=== MONEV RUNNER: {today_str} {jam_str} WIB ===", flush=True)
     try:
@@ -789,7 +953,7 @@ def main(force=False, notify_telegram=False):
             warning_sisa = f"\n\n⚠️ *Pengingat:* Stok template hampir habis (tersisa {sisa_sekarang}). Disarankan menambah template baru ke `templates.json`."
 
         msg = (
-            f"🚀 *AUTO MONEV BERHASIL DIKIRIM (JAM 21:00 WIB)*\n\n"
+            f"🚀 *AUTO MONEV BERHASIL DIKIRIM (JAM {jam_label} WIB)*\n\n"
             f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
             f"📍 *Lokasi:* `{OFFICE_LAT}, {OFFICE_LONG}`\n\n"
             f"📝 *Kegiatan:*\n_{template['activity']}_\n\n"
@@ -802,12 +966,20 @@ def main(force=False, notify_telegram=False):
         )
         if notify_telegram:
             kirim_telegram(msg)
-        return {"status": "success", "date": today_str, "message": msg, "sisa_template": sisa_sekarang, "total_template": total}
+        return {"status": "success", "date": today_str, "message": msg, "template": template, "sisa_template": sisa_sekarang, "total_template": total}
     except Exception as e:
-        msg = f"❌ *Gagal Eksekusi Monev:*\n`{e}`"
+        err_clean = safe_markdown(str(e), max_len=200)
+        msg = (
+            f"🚨 *PERINGATAN: AUTO MONEV GAGAL DIKIRIM (JAM {jam_label} WIB)*\n\n"
+            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+            f"❌ *Detail Kendala:* `{err_clean}`\n\n"
+            "⚠️ Presensi hari ini belum berhasil terisi otomatis.\n"
+            "Sistem akan mencoba auto-retry pada pemantauan jam 18:00 dan 21:00 WIB, atau Anda dapat eksekusi manual lewat tombol di bawah."
+        )
         if notify_telegram:
-            kirim_telegram(msg)
+            kirim_telegram(msg, reply_markup=MENU_KEYBOARD)
         raise e
 
 if __name__ == "__main__":
     main(notify_telegram=True)
+

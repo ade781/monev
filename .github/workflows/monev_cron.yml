@@ -36,15 +36,18 @@ jobs:
           now_wib = datetime.now(monev_bot.WIB)
           hour = now_wib.hour
           print(f'=== Auto Scheduler Aktif: {now_wib} (Jam WIB: {hour}) ===')
-          if hour == 19:
-              print('[19:00 WIB] Mengirim Pengingat Santai...')
-              monev_bot.kirim_pengingat_monev(force_mode='santai')
-          elif hour == 20:
-              print('[20:00 WIB] Mengirim Pengingat Keras...')
-              monev_bot.kirim_pengingat_monev(force_mode='keras')
-          elif hour >= 21:
-              print('[21:00 WIB+] Mengecek dan Menjalankan Auto Monev Cadangan...')
+          if hour == 9:
+              print('[09:00 WIB] Mengirim Status Pagi...')
+              monev_bot.kirim_status_harian(waktu_label='pagi')
+          elif hour == 15:
+              print('[15:00 WIB] Menjalankan Auto Monev...')
               monev_bot.main(notify_telegram=True)
+          elif hour == 18:
+              print('[18:00 WIB] Cek Monev Jam 6 Sore & Auto-Retry jika kosong...')
+              monev_bot.kirim_status_harian(waktu_label='sore')
+          elif hour >= 21:
+              print('[21:00 WIB] Cek Monev Jam 9 Malam + Cuplikan Kegiatan...')
+              monev_bot.kirim_status_harian(waktu_label='malam')
           else:
               print(f'[{now_wib.strftime(\"%H:%M\")} WIB] Manual dispatch / trigger di luar jadwal malam.')
               print('Hanya menjalankan tes diagnostik sistem (tanpa mengirim presensi):')

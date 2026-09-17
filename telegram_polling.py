@@ -85,16 +85,21 @@ def main():
                     sender = cb.get("from", {}).get("first_name", "User")
                     data_val = cb.get("data", "").strip()
 
+                    cb_msg_id = cb.get("message", {}).get("message_id")
                     try:
                         ack_url = f"https://api.telegram.org/bot{clean_token}/answerCallbackQuery"
                         ack_req = urllib.request.Request(
                             ack_url,
-                            data=json.dumps({"callback_query_id": cb_id}).encode("utf-8"),
+                            data=json.dumps({"callback_query_id": cb_id, "text": "⏳ Sedang memproses..."}).encode("utf-8"),
                             headers={"Content-Type": "application/json"}
                         )
                         direct_opener.open(ack_req, timeout=5)
                     except Exception:
                         pass
+
+                    # Hapus tombol konfirmasi agar tidak diklik dua kali
+                    if chat_id and cb_msg_id and (data_val in ["/monev_confirm", "/monev_cancel", "/isi_confirm"] or data_val.startswith("/isi_ok:")):
+                        monev_bot.edit_pesan_telegram(chat_id, cb_msg_id, reply_markup={"inline_keyboard": []})
 
                     print(f"[KLIK TOMBOL] Dari {sender} (ID: {chat_id}): '{data_val}'", flush=True)
                     txt, kb = reply if isinstance(reply := handle_telegram_command(chat_id, data_val), tuple) else (reply, monev_bot.MENU_KEYBOARD)

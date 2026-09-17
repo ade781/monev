@@ -216,7 +216,7 @@ def handle_telegram_command(chat_id, text):
             f"📊 *Total Koleksi:* `{total} template`\n"
             f"✅ *Sudah Pernah Terpakai:* `{terpakai} template`\n"
             f"⏳ *Sisa Belum Terpakai:* *{sisa} template*\n\n"
-            "✨ _Setiap template dijamin tidak akan pernah dipakai berulang kali. Saat auto-monev jam 21:00 berjalan, sistem akan memilih template berikutnya secara berurutan._"
+            "✨ _Setiap template dijamin tidak akan pernah dipakai berulang kali. Saat auto-monev jam 15:00 berjalan, sistem akan memilih template berikutnya secara berurutan._"
             f"{warning_info}",
             monev_bot.MENU_KEYBOARD
         )
@@ -236,6 +236,17 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         """Menangani Webhook pesan masuk dan callback query tombol dari Telegram"""
         try:
+            # Verifikasi secret token Telegram jika disetel
+            webhook_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+            if webhook_secret:
+                received_secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+                if received_secret != webhook_secret:
+                    self.send_response(403)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"error": "Forbidden: Invalid Telegram secret token"}')
+                    return
+
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
             update = json.loads(body.decode("utf-8")) if body else {}
@@ -262,6 +273,7 @@ class handler(BaseHTTPRequestHandler):
             if callback_query:
                 cq_id = callback_query.get("id")
                 chat_id = callback_query.get("message", {}).get("chat", {}).get("id") or callback_query.get("from", {}).get("id")
+                message_id = callback_query.get("message", {}).get("message_id")
                 cq_data = callback_query.get("data", "").strip()
 
                 if cq_id and token:
@@ -269,12 +281,16 @@ class handler(BaseHTTPRequestHandler):
                         ack_url = f"https://api.telegram.org/bot{token}/answerCallbackQuery"
                         ack_req = urllib.request.Request(
                             ack_url,
-                            data=json.dumps({"callback_query_id": cq_id}).encode("utf-8"),
+                            data=json.dumps({"callback_query_id": cq_id, "text": "⏳ Sedang memproses..."}).encode("utf-8"),
                             headers={"Content-Type": "application/json"}
                         )
                         urllib.request.urlopen(ack_req, timeout=5)
                     except Exception:
                         pass
+
+                # Hapus tombol konfirmasi pada pesan asli agar tidak bisa diklik ulang
+                if chat_id and message_id and (cq_data in ["/monev_confirm", "/monev_cancel", "/isi_confirm"] or cq_data.startswith("/isi_ok:")):
+                    monev_bot.edit_pesan_telegram(chat_id, message_id, reply_markup={"inline_keyboard": []})
 
                 if chat_id and cq_data:
                     _send_reply(chat_id, handle_telegram_command(chat_id, cq_data))
@@ -304,8 +320,19 @@ class handler(BaseHTTPRequestHandler):
         parsed_url = urllib.parse.urlparse(self.path)
         query_params = urllib.parse.parse_qs(parsed_url.query)
 
-        # 1. Fitur Setup Webhook otomatis
+        # 1. Fitur Setup Webhook otomatis (Dilindungi CRON_SECRET jika disetel)
         if "setup" in query_params or "setup_webhook" in query_params:
+            cron_secret = os.getenv("CRON_SECRET", "").strip()
+            auth_header = self.headers.get("Authorization", "")
+            provided_secret = query_params.get("secret", [""])[0]
+
+            if cron_secret and provided_secret != cron_secret and auth_header != f"Bearer {cron_secret}":
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"error": "Unauthorized: Invalid CRON_SECRET"}')
+                return
+
             host = self.headers.get("Host", "")
             webhook_url = query_params.get("url", [f"https://{host}/api/cron"])[0]
             
@@ -313,9 +340,12 @@ class handler(BaseHTTPRequestHandler):
             if token.lower().startswith("bot"):
                 token = token[3:]
 
+            webhook_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
             tg_res_body = {}
             if token:
                 tg_url = f"https://api.telegram.org/bot{token}/setWebhook?url={urllib.parse.quote(webhook_url)}"
+                if webhook_secret:
+                    tg_url += f"&secret_token={urllib.parse.quote(webhook_secret)}"
                 try:
                     res = urllib.request.urlopen(tg_url)
                     tg_res_body = json.loads(res.read().decode("utf-8"))
@@ -328,6 +358,7 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({
                 "action": "setup_webhook",
                 "webhook_url": webhook_url,
+                "secret_token_enabled": bool(webhook_secret),
                 "telegram_response": tg_res_body,
                 "instruction": "Webhook aktif! Buka Telegram @Cekad_bot dan ketik /start"
             }, indent=2).encode("utf-8"))
@@ -420,14 +451,12 @@ class handler(BaseHTTPRequestHandler):
             print(f"[Vercel Cron Trigger] Terdeteksi pada {now_wib} (Jam {hour} WIB)", flush=True)
             if hour == 9 and monev_bot.check_and_lock_trigger("status_pagi"):
                 res = monev_bot.kirim_status_harian(waktu_label="pagi")
-            elif hour == 15 and monev_bot.check_and_lock_trigger("status_sore"):
-                res = monev_bot.kirim_status_harian(waktu_label="sore")
-            elif hour == 19 and monev_bot.check_and_lock_trigger("reminder_santai"):
-                res = monev_bot.kirim_pengingat_monev(force_mode="santai")
-            elif hour == 20 and monev_bot.check_and_lock_trigger("reminder_keras"):
-                res = monev_bot.kirim_pengingat_monev(force_mode="keras")
-            elif hour == 21 and monev_bot.check_and_lock_trigger("auto_monev"):
+            elif hour == 15 and monev_bot.check_and_lock_trigger("auto_monev"):
                 res = monev_bot.main(notify_telegram=True)
+            elif hour == 18 and monev_bot.check_and_lock_trigger("status_sore"):
+                res = monev_bot.kirim_status_harian(waktu_label="sore")
+            elif hour == 21 and monev_bot.check_and_lock_trigger("status_malam"):
+                res = monev_bot.kirim_status_harian(waktu_label="malam")
             else:
                 res = {"status": "ok", "message": f"Cron berjalan di luar jam aksi atau sudah dieksekusi (Jam {hour} WIB)"}
 

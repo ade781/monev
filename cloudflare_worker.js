@@ -112,10 +112,9 @@ export default {
    * CRON TRIGGER SCHEDULER (100% TEPAT WAKTU PER DETIK DI CLOUDFLARE EDGE)
    * Jadwal Harian:
    * - 0 2 * * *  = 02:00 UTC (09:00 WIB) -> Monitoring Pagi & Cek Sistem
-   * - 0 8 * * *  = 08:00 UTC (15:00 WIB) -> Monitoring Sore & Cek Sistem
-   * - 0 12 * * * = 12:00 UTC (19:00 WIB) -> Pengingat Santai
-   * - 0 13 * * * = 13:00 UTC (20:00 WIB) -> Pengingat Keras
-   * - 0 14 * * * = 14:00 UTC (21:00 WIB) -> Auto Monev Cadangan
+   * - 0 8 * * *  = 08:00 UTC (15:00 WIB) -> Auto Monev (Jam 3 Sore)
+   * - 0 11 * * * = 11:00 UTC (18:00 WIB) -> Cek Status Jam 6 Sore & Auto-Retry
+   * - 0 14 * * * = 14:00 UTC (21:00 WIB) -> Cek Status Jam 9 Malam + Cuplikan Monev & Auto-Retry
    */
   async scheduled(event, env, ctx) {
     const cron = event.cron;
@@ -128,13 +127,11 @@ export default {
     if (cron === "0 2 * * *" || hourUtc === 2) {
       path = "/api/cron?type=status&waktu=pagi";
     } else if (cron === "0 8 * * *" || hourUtc === 8) {
-      path = "/api/cron?type=status&waktu=sore";
-    } else if (cron === "0 12 * * *" || hourUtc === 12) {
-      path = "/api/cron?type=reminder&mode=santai";
-    } else if (cron === "0 13 * * *" || hourUtc === 13) {
-      path = "/api/cron?type=reminder&mode=keras";
-    } else if (cron === "0 14 * * *" || hourUtc === 14) {
       path = "/api/cron?type=auto";
+    } else if (cron === "0 11 * * *" || hourUtc === 11) {
+      path = "/api/cron?type=status&waktu=sore";
+    } else if (cron === "0 14 * * *" || hourUtc === 14) {
+      path = "/api/cron?type=status&waktu=malam";
     } else {
       console.log(`[CF Cron Idle] Scheduled trigger pada jam ${hourUtc} UTC di luar jadwal. Tidak ada request yang dikirim.`);
       return;
