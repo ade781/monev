@@ -89,10 +89,9 @@ Seluruh waktu operasional disinkronkan dengan zona Waktu Indonesia Barat (WIB, U
 | Waktu (WIB) | Cron (UTC) | Tipe Eksekusi | Deskripsi Operasional |
 | :---: | :---: | :---: | :--- |
 | **09:00 WIB** | `0 2 * * *` | `status (pagi)` | Pemeriksaan koneksi SSO Kemnaker dan laporan status presensi pagi. |
-| **15:00 WIB** | `0 8 * * *` | `status (sore)` | Monitoring status kehadiran harian dan status persetujuan mentor lapangan. |
-| **19:00 WIB** | `0 12 * * *` | `reminder (santai)` | Notifikasi pengingat pengisian presensi secara mandiri. Otomatis diabaikan jika presensi telah tercatat. |
-| **20:00 WIB** | `0 13 * * *` | `reminder (keras)` | Peringatan batas akhir satu jam sebelum penutupan pengisian mandiri. |
-| **21:00 WIB** | `0 14 * * *` | `auto` | Eksekusi cadangan otomatis untuk mengisi presensi dan logbook harian apabila presensi belum dilakukan secara mandiri. |
+| **15:00 WIB** | `0 8 * * *` | `auto` | **Eksekusi Utama Auto-Monev**: Mengisi absensi dan logbook harian otomatis (jika gagal, langsung beri alert error). |
+| **18:00 WIB** | `0 11 * * *` | `status (sore)` | Cek status kehadiran sore. Jika belum monev, otomatis melakukan **auto-retry submit** & laporkan hasilnya. |
+| **21:00 WIB** | `0 14 * * *` | `status (malam)` | Evaluasi kehadiran malam. Menampilkan **cuplikan kegiatan (8-12 kata)**. Jika belum terisi, otomatis **auto-retry** & peringatan darurat. |
 
 ---
 
@@ -179,12 +178,11 @@ Variabel-variabel berikut harus dikonfigurasikan pada file `.env` untuk pengguna
 1. Masuk ke [Cloudflare Dashboard](https://dash.cloudflare.com) > **Workers & Pages** > **Create Worker**.
 2. Beri nama worker (misalnya `monev-proxy`), lalu klik **Deploy**.
 3. Buka menu **Quick Edit**, masukkan seluruh kode dari berkas `cloudflare_worker.js`, kemudian simpan dan terapkan.
-4. Pada tab **Settings** > **Triggers**, tambahkan ekspresi cron berikut:
-   - `0 2 * * *` (09:00 WIB)
-   - `0 8 * * *` (15:00 WIB)
-   - `0 12 * * *` (19:00 WIB)
-   - `0 13 * * *` (20:00 WIB)
-   - `0 14 * * *` (21:00 WIB)
+4. Pada tab **Settings** > **Triggers**, ekspresi cron yang aktif adalah:
+   - `0 2 * * *` (09:00 WIB - Monitoring Pagi)
+   - `0 8 * * *` (15:00 WIB - Auto Monev Utama)
+   - `0 11 * * *` (18:00 WIB - Cek Monev Jam 6 Sore & Retry)
+   - `0 14 * * *` (21:00 WIB - Cek Monev Jam 9 Malam & Preview)
 5. Pada tab **Settings** > **Variables**, konfigurasikan variabel:
    - `VERCEL_DOMAIN` = URL deployment Vercel Anda (contoh: `https://monev-wine.vercel.app`)
    - `CRON_SECRET` = Kunci rahasia cron (jika menggunakan pengaman)
