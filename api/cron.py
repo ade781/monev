@@ -423,6 +423,17 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(b'{"error": "Unauthorized: Invalid CRON_SECRET"}')
                 return
 
+            now_wib = datetime.now(monev_bot.WIB)
+            if now_wib.weekday() >= 5 and not force_send:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "weekend_skipped",
+                    "message": "Hari ini akhir pekan (Sabtu/Minggu). Pengisian otomatis dilewati."
+                }).encode("utf-8"))
+                return
+
             if not monev_bot.check_and_lock_trigger("auto_monev", force=force_send):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -452,7 +463,10 @@ class handler(BaseHTTPRequestHandler):
             if hour == 9 and monev_bot.check_and_lock_trigger("status_pagi"):
                 res = monev_bot.kirim_status_harian(waktu_label="pagi")
             elif hour == 15 and monev_bot.check_and_lock_trigger("auto_monev"):
-                res = monev_bot.main(notify_telegram=True)
+                if now_wib.weekday() >= 5:
+                    res = {"status": "weekend_skipped", "message": "Auto monev dilewati karena akhir pekan (Sabtu/Minggu)."}
+                else:
+                    res = monev_bot.main(notify_telegram=True)
             elif hour == 18 and monev_bot.check_and_lock_trigger("status_sore"):
                 res = monev_bot.kirim_status_harian(waktu_label="sore")
             elif hour == 21 and monev_bot.check_and_lock_trigger("status_malam"):

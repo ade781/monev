@@ -100,10 +100,10 @@ Seluruh waktu operasional disinkronkan dengan zona Waktu Indonesia Barat (WIB, U
 - **Zero External Dependencies**: Menggunakan pustaka standar Python bawaan (`urllib`, `http.cookiejar`, `json`, `os`, `time`, `random`) tanpa memerlukan instalasi modul pihak ketiga.
 - **Autentikasi SSO Otomatis & Caching Token**: Mendukung siklus login SSO SIAPkerja multi-langkah (validasi cookie, token CSRF, dan callback handshake) disertai penyimpanan cache token lokal dengan batas waktu aktif (TTL) hingga 5.5 jam.
 - **Validasi Kehadiran Mandiri (Guard Check)**: Sistem selalu memverifikasi status presensi di server Kemnaker terlebih dahulu. Apabila data kehadiran hari bersangkutan sudah berstatus `PRESENT`, sistem tidak akan melakukan penimpaan data.
-- **Koleksi Template Kegiatan Non-Duplikasi**: Dilengkapi 40 variasi template logbook aktivitas harian. Setiap template yang telah digunakan dicatat ke dalam `used_templates.json` sehingga tidak terjadi pengulangan kegiatan.
+- **Koleksi Template Kegiatan Non-Duplikasi**: Dilengkapi 40 variasi template logbook aktivitas harian yang 100% berfokus pada rekayasa & pengembangan aplikasi web ARFF YIA. Setiap template yang telah digunakan dicatat ke dalam `used_templates.json` serta diverifikasi silang langsung ke Kemnaker sehingga tidak terjadi pengulangan kegiatan.
 - **Simulasi Deviasi Koordinat (GPS Jittering)**: Koordinat presensi diberi deviasi mikro natural secara acak (rentang 10 hingga 25 meter) agar posisi presensi tidak terdeteksi sebagai koordinat statis.
 - **Mekanisme Debounce (15 Menit)**: Mencegah eksekusi ganda apabila terjadi pemicuan berulang dalam interval waktu yang berdekatan.
-- **Dukungan Akhir Pekan (Weekend Awareness)**: Pengingat otomatis memberikan label penyesuaian khusus pada hari libur (Sabtu dan Minggu).
+- **Proteksi Akhir Pekan (Weekend Protection)**: Auto-Monev dan auto-retry otomatis dinonaktifkan pada hari Sabtu dan Minggu untuk menjaga integritas data hari kerja magang di Kemnaker.
 - **Antarmuka Bot Interaktif**: Dilengkapi menu tombol inline pada Telegram untuk mempermudah pengecekan status dan konfirmasi tindakan.
 
 ---
@@ -137,7 +137,7 @@ monev/
 ├── cloudflare_worker.js        # Script Cloudflare Worker (Cron Trigger & Reverse Proxy)
 ├── monev_bot.py                # Mesin utama: SSO Kemnaker, API client, template engine
 ├── telegram_polling.py         # Skrip pengujian interaksi bot lokal via polling
-├── templates.json              # Koleksi 35 template aktivitas, pembelajaran, dan kendala
+├── templates.json              # Koleksi 40 template aktivitas pengembangan aplikasi, pembelajaran, dan kendala
 ├── reminder_templates.json     # Variasi teks notifikasi pengingat harian
 ├── used_templates.json         # Log riwayat template kegiatan yang telah digunakan
 ├── wrangler.toml               # Konfigurasi deployment Cloudflare Worker

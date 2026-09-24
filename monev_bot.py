@@ -302,6 +302,13 @@ def edit_pesan_telegram(chat_id, message_id, text=None, reply_markup=None):
     return False
 
 # 3. Autentikasi SSO Kemnaker
+class SafeCookieJar(http.cookiejar.CookieJar):
+    """CookieJar yang memfilter cookie tracking WAF (acw_tc) agar tidak bocor antar-subdomain Kemnaker"""
+    def set_cookie(self, cookie):
+        if cookie.name == "acw_tc":
+            return
+        super().set_cookie(cookie)
+
 def login_kemnaker(force_refresh=False):
     global _CACHED_TOKEN, _CACHED_TOKEN_TIME
     now = time.time()
@@ -318,7 +325,7 @@ def login_kemnaker(force_refresh=False):
     if manual and len(manual) > 20:
         return manual.strip()
 
-    cj = http.cookiejar.CookieJar()
+    cj = SafeCookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
     browser_headers = {
         "User-Agent": USER_AGENT,
@@ -840,6 +847,21 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
         return {"status": "success", "sudah_absen": True, "message": f"Status {w_norm} terkirim (sudah monev)"}
 
     # 2. KONDISI BELUM ABSEN
+    if is_weekend:
+        pesan = (
+            f"{salam_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{icon_waktu} *MONITORING AKHIR PEKAN ({waktu_title})*\n\n"
+            "🏖️ *Hari ini adalah akhir pekan (Sabtu/Minggu).*\n"
+            "Sistem auto-monev dinonaktifkan di hari libur kerja. Selamat menikmati akhir pekan dan selamat beristirahat! ☕✨\n\n"
+            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+            f"👤 *Peserta:* `{user_name}`\n"
+            f"📦 *Stok Template Tersedia:* `{sisa} dari {total} template`\n\n"
+            "👉 _Jika Anda memiliki shift operasional/tugas khusus hari ini, silakan isi manual via `/isi <kegiatan>`._"
+        )
+        kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
+        return {"status": "weekend_skipped", "sudah_absen": False, "message": f"Status akhir pekan ({w_norm}) terkirim (libur)"}
+
     if is_pagi:
         pesan = (
             f"{salam_text}\n\n"
@@ -929,6 +951,20 @@ def main(force=False, notify_telegram=False):
     jam_label = today_wib.strftime("%H:%M")
 
     print(f"=== MONEV RUNNER: {today_str} {jam_str} WIB ===", flush=True)
+
+    is_weekend = today_wib.weekday() >= 5
+    if is_weekend and not force:
+        msg = (
+            f"🏖️ *AKHIR PEKAN: AUTO-MONEV DILEWATI (JAM {jam_label} WIB)*\n\n"
+            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
+            "Hari ini adalah akhir pekan (Sabtu/Minggu). Pengisian presensi otomatis dinonaktifkan untuk menjaga integritas data hari kerja magang di Kemnaker.\n\n"
+            "💡 _Jika Anda memiliki shift operasional khusus hari ini, silakan gunakan perintah `/isi <kegiatan>` atau klik tombol di bawah._"
+        )
+        print(f"[Weekend Skip] {today_str} adalah akhir pekan (Sabtu/Minggu). Auto-Monev dilewati.", flush=True)
+        if notify_telegram:
+            kirim_telegram(msg, reply_markup=MENU_KEYBOARD)
+        return {"status": "weekend_skipped", "date": today_str, "message": msg}
+
     try:
         token = login_kemnaker()
         sudah, data_absen = periksa_absen_hari_ini(token, today_str)

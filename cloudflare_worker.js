@@ -56,8 +56,22 @@ export default {
       if (!["host", "cf-connecting-ip", "cf-ray", "cf-visitor"].includes(key.toLowerCase())) {
         newHeaders.set(key, value);
       }
-    }
     newHeaders.set("Host", targetUrl.host);
+
+    // Filter cookie acw_tc jika target bukan maganghub agar tidak memicu timeout WAF
+    if (newHeaders.has("cookie") && targetUrl.host !== "maganghub.kemnaker.go.id") {
+      const cookieHeader = newHeaders.get("cookie");
+      const cleaned = cookieHeader
+        .split(";")
+        .map(c => c.trim())
+        .filter(c => !c.toLowerCase().startsWith("acw_tc="))
+        .join("; ");
+      if (cleaned) {
+        newHeaders.set("cookie", cleaned);
+      } else {
+        newHeaders.delete("cookie");
+      }
+    }
 
     // Forward request ke target Kemnaker
     try {
@@ -127,6 +141,12 @@ export default {
     if (cron === "0 2 * * *" || hourUtc === 2) {
       path = "/api/cron?type=status&waktu=pagi";
     } else if (cron === "0 8 * * *" || hourUtc === 8) {
+      // 08:00 UTC = 15:00 WIB di hari yang sama. Cek apakah akhir pekan (Minggu=0, Sabtu=6)
+      const dayOfWeek = now.getUTCDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        console.log(`[CF Cron] Auto-monev jam 15:00 WIB dilewati karena hari ini akhir pekan (Day ${dayOfWeek}).`);
+        return;
+      }
       path = "/api/cron?type=auto";
     } else if (cron === "0 11 * * *" || hourUtc === 11) {
       path = "/api/cron?type=status&waktu=sore";

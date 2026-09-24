@@ -2,7 +2,21 @@
   "used_ids": [
     1,
     2,
-    3
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17
   ],
   "history": [
     {
@@ -25,6 +39,104 @@
       "category": "coordination",
       "activity": "Menghadiri sesi koordinasi dan evaluasi progres mingguan bersama mentor unit kerja, Bapak Ananta, di area kantor operasional Graha Angkasa Pura YIA...",
       "timestamp": "2026-09-10T21:00:00+07:00"
+    },
+    {
+      "date": "2026-09-11",
+      "template_id": 4,
+      "category": "backend_api",
+      "activity": "Merancang, membangun, dan menguji endpoint RESTful API baru pada backend Express.js untuk memfasilitasi pencarian dan pe...",
+      "timestamp": "2026-09-11T21:00:29.86994+07:00"
+    },
+    {
+      "date": "2026-09-12",
+      "template_id": 5,
+      "category": "data_verification",
+      "activity": "Melakukan penelusuran, pendataan ulang, dan verifikasi silang (cross-check) data logbook fisik tabung pemadam api ringan...",
+      "timestamp": "2026-09-12T21:00:32.551067+07:00"
+    },
+    {
+      "date": "2026-09-13",
+      "template_id": 6,
+      "category": "ui_ux",
+      "activity": "Merombak dan menyempurnakan tata letak (layout) antarmuka halaman formulir inspeksi harian pada aplikasi ARFF agar sepen...",
+      "timestamp": "2026-09-13T13:14:54.084903+07:00"
+    },
+    {
+      "date": "2026-09-14",
+      "template_id": 7,
+      "category": "debugging",
+      "activity": "Melakukan penelusuran mendalam dan perbaikan bug (debugging) terkait kendala izin akses kamera (camera permission) yang ...",
+      "timestamp": "2026-09-14T21:00:32.423971+07:00"
+    },
+    {
+      "date": "2026-09-15",
+      "template_id": 8,
+      "category": "refactoring",
+      "activity": "Melakukan refaktorisasi kode program pada modul frontend React dengan memecah komponen-komponen monolitik yang berukuran...",
+      "timestamp": "2026-09-15T21:00:38.13037+07:00"
+    },
+    {
+      "date": "2026-09-16",
+      "template_id": 9,
+      "category": "documentation",
+      "activity": "Menyusun dokumen panduan teknis dan buku petunjuk operasional (User Manual Guide) aplikasi sistem pelaporan inspeksi ARF...",
+      "timestamp": "2026-09-16T21:00:32.18483+07:00"
+    },
+    {
+      "date": "2026-09-17",
+      "template_id": 10,
+      "category": "coordination",
+      "activity": "Melakukan pertemuan koordinasi teknis bersama tim operasional ARFF YIA dan rekan magang Habib guna membahas standardisas...",
+      "timestamp": "2026-09-17T15:00:27.651636+07:00"
+    },
+    {
+      "date": "2026-09-18",
+      "template_id": 11,
+      "category": "frontend_features",
+      "activity": "Mengembangkan fitur pencarian cepat (instant search) dan filter multi-kategori pada halaman daftar inventaris tabung APA...",
+      "timestamp": "2026-09-18T15:00:28.045295+07:00"
+    },
+    {
+      "date": "2026-09-19",
+      "template_id": 12,
+      "category": "database",
+      "activity": "Melakukan evaluasi dan perancangan ulang skema relasi database (database schema normalization) pada sistem pencatatan in...",
+      "timestamp": "2026-09-19T15:00:23.676092+07:00"
+    },
+    {
+      "date": "2026-09-20",
+      "template_id": 13,
+      "category": "field_observation",
+      "activity": "Mengikuti sesi observasi lapangan langsung bersama regu petugas jaga ARFF YIA dalam pelaksanaan inspeksi rutin tabung AP...",
+      "timestamp": "2026-09-20T15:00:23.577194+07:00"
+    },
+    {
+      "date": "2026-09-21",
+      "template_id": 14,
+      "category": "testing_qa",
+      "activity": "Melaksanakan sesi pengujian menyeluruh (Quality Assurance & End-to-End Testing) pada modul alur inspeksi aplikasi ARFF Y...",
+      "timestamp": "2026-09-21T15:07:37.575998+07:00"
+    },
+    {
+      "date": "2026-09-22",
+      "template_id": 15,
+      "category": "export_report",
+      "activity": "Membangun dan menyempurnakan fitur ekspor laporan inspeksi berkala ke dalam format file PDF dan lembar kerja Excel pada ...",
+      "timestamp": "2026-09-22T15:00:27.330321+07:00"
+    },
+    {
+      "date": "2026-09-23",
+      "template_id": 16,
+      "category": "environment_setup",
+      "activity": "Melakukan konfigurasi lingkungan kerja pengembangan (development environment), sinkronisasi dependensi package repositor...",
+      "timestamp": "2026-09-23T14:33:15.202558+07:00"
+    },
+    {
+      "date": "2026-09-24",
+      "template_id": 17,
+      "category": "coordination",
+      "activity": "Mengikuti sesi briefing pagi dan koordinasi rutin bersama tim ARFF YIA di posko utama penyelamatan bandara. Mendengarkan...",
+      "timestamp": "2026-09-24T15:00:53.783992+07:00"
     }
   ]
 }
