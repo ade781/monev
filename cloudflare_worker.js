@@ -56,6 +56,7 @@ export default {
       if (!["host", "cf-connecting-ip", "cf-ray", "cf-visitor"].includes(key.toLowerCase())) {
         newHeaders.set(key, value);
       }
+    }
     newHeaders.set("Host", targetUrl.host);
 
     // Filter cookie acw_tc jika target bukan maganghub agar tidak memicu timeout WAF
@@ -124,33 +125,38 @@ export default {
 
   /**
    * CRON TRIGGER SCHEDULER (100% TEPAT WAKTU PER DETIK DI CLOUDFLARE EDGE)
-   * Jadwal Harian:
-   * - 0 2 * * *  = 02:00 UTC (09:00 WIB) -> Monitoring Pagi & Cek Sistem
-   * - 0 8 * * *  = 08:00 UTC (15:00 WIB) -> Auto Monev (Jam 3 Sore)
-   * - 0 11 * * * = 11:00 UTC (18:00 WIB) -> Cek Status Jam 6 Sore & Auto-Retry
-   * - 0 14 * * * = 14:00 UTC (21:00 WIB) -> Cek Status Jam 9 Malam + Cuplikan Monev & Auto-Retry
+   * Jadwal Hari Kerja (Senin–Jumat / 1-5):
+   * - 0 2 * * 1-5  = 02:00 UTC (09:00 WIB) -> Monitoring Pagi & Cek Sistem
+   * - 0 8 * * 1-5  = 08:00 UTC (15:00 WIB) -> Auto Monev (Jam 3 Sore)
+   * - 0 11 * * 1-5 = 11:00 UTC (18:00 WIB) -> Cek Status Jam 6 Sore & Auto-Retry
+   * - 0 14 * * 1-5 = 14:00 UTC (21:00 WIB) -> Cek Status Jam 9 Malam + Cuplikan Monev & Auto-Retry
+   * Akhir pekan (Sabtu & Minggu): Tidak ada aktivitas / disabled total.
    */
   async scheduled(event, env, ctx) {
-    const cron = event.cron;
+    const cron = event.cron || "";
     const now = new Date();
+    // Konversi ke Waktu Indonesia Barat (WIB, UTC+7)
+    const wibDate = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const dayOfWeek = wibDate.getUTCDay(); // 0 = Minggu, 6 = Sabtu
+
+    // Proteksi weekend mutlak: Hentikan seluruh cron di hari Sabtu dan Minggu
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      console.log(`[CF Cron] Akhir pekan (Sabtu/Minggu - Day ${dayOfWeek}). Seluruh aktivitas cron dinonaktifkan.`);
+      return;
+    }
+
     const hourUtc = now.getUTCHours();
     const vercelHost = (env && env.VERCEL_DOMAIN) ? env.VERCEL_DOMAIN.replace(/\/+$/, "") : "https://monev-wine.vercel.app";
     const cronSecret = (env && env.CRON_SECRET) ? env.CRON_SECRET.trim() : "";
 
     let path = "";
-    if (cron === "0 2 * * *" || hourUtc === 2) {
+    if (cron.startsWith("0 2 * *") || hourUtc === 2) {
       path = "/api/cron?type=status&waktu=pagi";
-    } else if (cron === "0 8 * * *" || hourUtc === 8) {
-      // 08:00 UTC = 15:00 WIB di hari yang sama. Cek apakah akhir pekan (Minggu=0, Sabtu=6)
-      const dayOfWeek = now.getUTCDay();
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        console.log(`[CF Cron] Auto-monev jam 15:00 WIB dilewati karena hari ini akhir pekan (Day ${dayOfWeek}).`);
-        return;
-      }
+    } else if (cron.startsWith("0 8 * *") || hourUtc === 8) {
       path = "/api/cron?type=auto";
-    } else if (cron === "0 11 * * *" || hourUtc === 11) {
+    } else if (cron.startsWith("0 11 * *") || hourUtc === 11) {
       path = "/api/cron?type=status&waktu=sore";
-    } else if (cron === "0 14 * * *" || hourUtc === 14) {
+    } else if (cron.startsWith("0 14 * *") || hourUtc === 14) {
       path = "/api/cron?type=status&waktu=malam";
     } else {
       console.log(`[CF Cron Idle] Scheduled trigger pada jam ${hourUtc} UTC di luar jadwal. Tidak ada request yang dikirim.`);

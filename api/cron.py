@@ -368,6 +368,18 @@ class handler(BaseHTTPRequestHandler):
         if "type" in query_params and query_params["type"][0] == "reminder":
             force_mode = query_params.get("mode", [None])[0]
             force_send = query_params.get("force", ["0"])[0] in ["1", "true"] or "force" in query_params
+
+            now_wib = datetime.now(monev_bot.WIB)
+            if now_wib.weekday() >= 5 and not force_send:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "weekend_skipped",
+                    "message": "Hari ini akhir pekan (Sabtu/Minggu). Pengingat dinonaktifkan."
+                }).encode("utf-8"))
+                return
+
             trigger_key = f"reminder_{force_mode or 'auto'}"
             if not monev_bot.check_and_lock_trigger(trigger_key, force=force_send):
                 self.send_response(200)
@@ -382,10 +394,22 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(result).encode("utf-8"))
             return
 
-        # 3. Fitur Monitoring Status & Heartbeat Sistem (09:00 WIB & 15:00 WIB)
+        # 3. Fitur Monitoring Status & Heartbeat Sistem (09:00 WIB, 18:00 WIB, 21:00 WIB)
         if "type" in query_params and query_params["type"][0] in ["status", "status_check", "heartbeat", "check"]:
             waktu_label = query_params.get("waktu", query_params.get("time", [None]))[0]
             force_send = query_params.get("force", ["0"])[0] in ["1", "true"] or "force" in query_params
+
+            now_wib = datetime.now(monev_bot.WIB)
+            if now_wib.weekday() >= 5 and not force_send:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "weekend_skipped",
+                    "message": "Hari ini akhir pekan (Sabtu/Minggu). Monitoring status dinonaktifkan."
+                }).encode("utf-8"))
+                return
+
             trigger_key = f"status_{waktu_label or 'auto'}"
             if not monev_bot.check_and_lock_trigger(trigger_key, force=force_send):
                 self.send_response(200)
@@ -393,7 +417,7 @@ class handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "duplicate_skipped", "message": f"Status check {trigger_key} sudah dijalankan baru-baru ini."}).encode("utf-8"))
                 return
-            result = monev_bot.kirim_status_harian(waktu_label=waktu_label)
+            result = monev_bot.kirim_status_harian(waktu_label=waktu_label, force=force_send)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -458,15 +482,22 @@ class handler(BaseHTTPRequestHandler):
         is_vercel_cron = "x-vercel-cron" in self.headers or "vercel-cron" in self.headers.get("User-Agent", "").lower()
         if is_vercel_cron:
             now_wib = datetime.now(monev_bot.WIB)
+            if now_wib.weekday() >= 5:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "weekend_skipped",
+                    "message": "Hari ini akhir pekan (Sabtu/Minggu). Seluruh jadwal cron dinonaktifkan."
+                }).encode("utf-8"))
+                return
+
             hour = now_wib.hour
             print(f"[Vercel Cron Trigger] Terdeteksi pada {now_wib} (Jam {hour} WIB)", flush=True)
             if hour == 9 and monev_bot.check_and_lock_trigger("status_pagi"):
                 res = monev_bot.kirim_status_harian(waktu_label="pagi")
             elif hour == 15 and monev_bot.check_and_lock_trigger("auto_monev"):
-                if now_wib.weekday() >= 5:
-                    res = {"status": "weekend_skipped", "message": "Auto monev dilewati karena akhir pekan (Sabtu/Minggu)."}
-                else:
-                    res = monev_bot.main(notify_telegram=True)
+                res = monev_bot.main(notify_telegram=True)
             elif hour == 18 and monev_bot.check_and_lock_trigger("status_sore"):
                 res = monev_bot.kirim_status_harian(waktu_label="sore")
             elif hour == 21 and monev_bot.check_and_lock_trigger("status_malam"):

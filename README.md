@@ -88,10 +88,12 @@ Seluruh waktu operasional disinkronkan dengan zona Waktu Indonesia Barat (WIB, U
 
 | Waktu (WIB) | Cron (UTC) | Tipe Eksekusi | Deskripsi Operasional |
 | :---: | :---: | :---: | :--- |
-| **09:00 WIB** | `0 2 * * *` | `status (pagi)` | Pemeriksaan koneksi SSO Kemnaker dan laporan status presensi pagi. |
-| **15:00 WIB** | `0 8 * * *` | `auto` | **Eksekusi Utama Auto-Monev**: Mengisi absensi dan logbook harian otomatis (jika gagal, langsung beri alert error). |
-| **18:00 WIB** | `0 11 * * *` | `status (sore)` | Cek status kehadiran sore. Jika belum monev, otomatis melakukan **auto-retry submit** & laporkan hasilnya. |
-| **21:00 WIB** | `0 14 * * *` | `status (malam)` | Evaluasi kehadiran malam. Menampilkan **cuplikan kegiatan (8-12 kata)**. Jika belum terisi, otomatis **auto-retry** & peringatan darurat. |
+| **09:00 WIB** | `0 2 * * 1-5` | `status (pagi)` | Pemeriksaan koneksi SSO Kemnaker dan laporan status presensi pagi (Senin–Jumat). |
+| **15:00 WIB** | `0 8 * * 1-5` | `auto` | **Eksekusi Utama Auto-Monev**: Mengisi absensi dan logbook harian otomatis (Senin–Jumat). |
+| **18:00 WIB** | `0 11 * * 1-5` | `status (sore)` | Cek status kehadiran sore. Jika belum monev, otomatis melakukan **auto-retry submit** & laporkan hasilnya (Senin–Jumat). |
+| **21:00 WIB** | `0 14 * * 1-5` | `status (malam)` | Evaluasi kehadiran malam. Menampilkan **cuplikan kegiatan (8-12 kata)**. Jika belum terisi, otomatis **auto-retry** & peringatan darurat (Senin–Jumat). |
+
+> **Catatan Akhir Pekan (Sabtu & Minggu):** Seluruh cron, auto-monev, pengingat, dan notifikasi status dinonaktifkan total (100% hening/tanpa pesan).
 
 ---
 
@@ -103,7 +105,7 @@ Seluruh waktu operasional disinkronkan dengan zona Waktu Indonesia Barat (WIB, U
 - **Koleksi Template Kegiatan Non-Duplikasi**: Dilengkapi 40 variasi template logbook aktivitas harian yang 100% berfokus pada rekayasa & pengembangan aplikasi web ARFF YIA. Setiap template yang telah digunakan dicatat ke dalam `used_templates.json` serta diverifikasi silang langsung ke Kemnaker sehingga tidak terjadi pengulangan kegiatan.
 - **Simulasi Deviasi Koordinat (GPS Jittering)**: Koordinat presensi diberi deviasi mikro natural secara acak (rentang 10 hingga 25 meter) agar posisi presensi tidak terdeteksi sebagai koordinat statis.
 - **Mekanisme Debounce (15 Menit)**: Mencegah eksekusi ganda apabila terjadi pemicuan berulang dalam interval waktu yang berdekatan.
-- **Proteksi Akhir Pekan (Weekend Protection)**: Auto-Monev dan auto-retry otomatis dinonaktifkan pada hari Sabtu dan Minggu untuk menjaga integritas data hari kerja magang di Kemnaker.
+- **Proteksi Akhir Pekan Total (Full Weekend Inactive)**: Auto-Monev, pengingat, status monitoring, dan cron job dinonaktifkan total pada hari Sabtu dan Minggu (tidak ada aktivitas maupun pesan Telegram sama sekali).
 - **Antarmuka Bot Interaktif**: Dilengkapi menu tombol inline pada Telegram untuk mempermudah pengecekan status dan konfirmasi tindakan.
 
 ---

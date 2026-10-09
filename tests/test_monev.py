@@ -154,18 +154,30 @@ class TestMonevCore(unittest.TestCase):
         self.assertEqual(total, 40)
 
     def test_weekend_auto_monev_skip(self):
-        """Uji auto-monev melewati eksekusi di hari Sabtu dan Minggu"""
+        """Uji auto-monev, status, dan pengingat melewati eksekusi di hari Sabtu dan Minggu tanpa mengirim apapun ke Telegram"""
         from unittest.mock import patch
         
         # Simulasi hari Sabtu (2026-09-26)
         saturday = datetime(2026, 9, 26, 15, 0, 0, tzinfo=monev_bot.WIB)
-        with patch("monev_bot.datetime") as mock_dt:
+        with patch("monev_bot.datetime") as mock_dt, patch("monev_bot.kirim_telegram") as mock_tg:
             mock_dt.now.return_value = saturday
             mock_dt.side_effect = lambda *args, **kw: datetime(*args, **kw)
             
-            res = monev_bot.main(force=False, notify_telegram=False)
-            self.assertEqual(res["status"], "weekend_skipped")
-            self.assertIn("akhir pekan", res["message"].lower())
+            # 1. Main auto-monev
+            res_main = monev_bot.main(force=False, notify_telegram=True)
+            self.assertEqual(res_main["status"], "weekend_skipped")
+            self.assertIn("akhir pekan", res_main["message"].lower())
+            
+            # 2. Status harian
+            res_status = monev_bot.kirim_status_harian(waktu_label="pagi")
+            self.assertEqual(res_status["status"], "weekend_skipped")
+            
+            # 3. Pengingat monev
+            res_reminder = monev_bot.kirim_pengingat_monev()
+            self.assertEqual(res_reminder["status"], "weekend_skipped")
+            
+            # Pastikan sama sekali TIDAK ADA pengiriman pesan Telegram di akhir pekan
+            mock_tg.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()

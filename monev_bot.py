@@ -699,6 +699,10 @@ def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
     is_weekend = today_wib.weekday() >= 5
+    if is_weekend and not force_send:
+        print(f"[Pengingat] Hari ini akhir pekan ({today_str}). Pengingat dilewati.", flush=True)
+        return {"status": "weekend_skipped", "message": "Hari ini akhir pekan (Sabtu/Minggu). Pengingat dinonaktifkan."}
+
     try:
         sudah, _ = periksa_absen_hari_ini(login_kemnaker(), today_str)
         if sudah and not force_send:
@@ -711,12 +715,11 @@ def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
     is_malam = force_mode == "malam" or (force_mode is None and today_wib.hour >= 20)
     daftar = temps.get("malam_21" if is_malam else "sore_18", [])
     salam_random = random.choice(daftar) if daftar else "Halo Mas Ade, jangan lupa cek monev hari ini ya!"
-    catatan_weekend = "\n🏖️ _Catatan: Jika hari ini Anda libur magang/tidak ada shift, silakan abaikan pengingat ini._\n" if is_weekend else ""
 
     pesan = (
         f"{salam_random}\n\n"
         f"_{('🌙 EVALUASI MALAM JAM 21:00 WIB' if is_malam else '🌤️ CEK STATUS SORE JAM 18:00 WIB')}_\n"
-        f"⏰ *Jadwal Presensi:* Mandiri atau Auto-Monev Jam 15:00 WIB{catatan_weekend}\n"
+        "⏰ *Jadwal Presensi:* Mandiri atau Auto-Monev Jam 15:00 WIB\n"
         "💡 _Ketik `/isi <kegiatan>` atau klik tombol di bawah._"
     )
     kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
@@ -724,17 +727,23 @@ def kirim_pengingat_monev(chat_id=None, force_mode=None, force_send=False):
 
 kirim_pengingat_sore = kirim_pengingat_monev
 
-def kirim_status_harian(waktu_label=None, chat_id=None):
+def kirim_status_harian(waktu_label=None, chat_id=None, force=False):
     """
-    Mengirim laporan status presensi & monitoring sistem harian:
+    Mengirim laporan status presensi & monitoring sistem harian (Senin–Jumat):
     - 09:00 WIB ("pagi"): Monitoring pagi & cek kesehatan SSO / proxy.
     - 18:00 WIB ("sore"): Cek apakah sudah monev. Jika belum (misal jam 15:00 gagal), otomatis auto-retry!
     - 21:00 WIB ("malam"): Cek apakah sudah monev + cuplikan kegiatan (8-12 kata). Jika belum, otomatis auto-retry & peringatan darurat!
+    Sabtu & Minggu: Dinonaktifkan total (tidak ada pesan atau aksi).
     """
     today_wib = datetime.now(WIB)
     today_str = today_wib.strftime("%Y-%m-%d")
     jam_str = today_wib.strftime("%H:%M:%S")
     is_weekend = today_wib.weekday() >= 5
+
+    # Proteksi weekend mutlak: jangan kirim status apapun ke Telegram di akhir pekan
+    if is_weekend and not force:
+        print(f"[Status Harian] Hari ini akhir pekan ({today_str}). Pengiriman status dilewati.", flush=True)
+        return {"status": "weekend_skipped", "message": "Hari ini akhir pekan (Sabtu/Minggu). Pengiriman status dinonaktifkan."}
 
     if waktu_label:
         w_norm = str(waktu_label).lower().strip()
@@ -751,15 +760,14 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
     is_sore = w_norm == "sore"
     is_malam = w_norm == "malam"
 
-    weekend_badge = " 🏖️ [AKHIR PEKAN]" if is_weekend else ""
     if is_pagi:
-        waktu_title = f"PAGI (09:00 WIB){weekend_badge}"
+        waktu_title = "PAGI (09:00 WIB)"
         icon_waktu = "🌅"
     elif is_sore:
-        waktu_title = f"SORE (18:00 WIB){weekend_badge}"
+        waktu_title = "SORE (18:00 WIB)"
         icon_waktu = "🌤️"
     else:
-        waktu_title = f"MALAM (21:00 WIB){weekend_badge}"
+        waktu_title = "MALAM (21:00 WIB)"
         icon_waktu = "🌙"
 
     temps = muat_template_pengingat()
@@ -846,22 +854,7 @@ def kirim_status_harian(waktu_label=None, chat_id=None):
         kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
         return {"status": "success", "sudah_absen": True, "message": f"Status {w_norm} terkirim (sudah monev)"}
 
-    # 2. KONDISI BELUM ABSEN
-    if is_weekend:
-        pesan = (
-            f"{salam_text}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"{icon_waktu} *MONITORING AKHIR PEKAN ({waktu_title})*\n\n"
-            "🏖️ *Hari ini adalah akhir pekan (Sabtu/Minggu).*\n"
-            "Sistem auto-monev dinonaktifkan di hari libur kerja. Selamat menikmati akhir pekan dan selamat beristirahat! ☕✨\n\n"
-            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
-            f"👤 *Peserta:* `{user_name}`\n"
-            f"📦 *Stok Template Tersedia:* `{sisa} dari {total} template`\n\n"
-            "👉 _Jika Anda memiliki shift operasional/tugas khusus hari ini, silakan isi manual via `/isi <kegiatan>`._"
-        )
-        kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
-        return {"status": "weekend_skipped", "sudah_absen": False, "message": f"Status akhir pekan ({w_norm}) terkirim (libur)"}
-
+    # 2. KONDISI BELUM ABSEN (Hari Kerja)
     if is_pagi:
         pesan = (
             f"{salam_text}\n\n"
@@ -954,16 +947,12 @@ def main(force=False, notify_telegram=False):
 
     is_weekend = today_wib.weekday() >= 5
     if is_weekend and not force:
-        msg = (
-            f"🏖️ *AKHIR PEKAN: AUTO-MONEV DILEWATI (JAM {jam_label} WIB)*\n\n"
-            f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
-            "Hari ini adalah akhir pekan (Sabtu/Minggu). Pengisian presensi otomatis dinonaktifkan untuk menjaga integritas data hari kerja magang di Kemnaker.\n\n"
-            "💡 _Jika Anda memiliki shift operasional khusus hari ini, silakan gunakan perintah `/isi <kegiatan>` atau klik tombol di bawah._"
-        )
         print(f"[Weekend Skip] {today_str} adalah akhir pekan (Sabtu/Minggu). Auto-Monev dilewati.", flush=True)
-        if notify_telegram:
-            kirim_telegram(msg, reply_markup=MENU_KEYBOARD)
-        return {"status": "weekend_skipped", "date": today_str, "message": msg}
+        return {
+            "status": "weekend_skipped",
+            "date": today_str,
+            "message": "Hari ini adalah akhir pekan (Sabtu/Minggu). Auto-Monev dilewati."
+        }
 
     try:
         token = login_kemnaker()
