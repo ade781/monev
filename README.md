@@ -1,260 +1,322 @@
-# Monev ADE7 Reminder - MagangHub Kemnaker
+# Monev ADE7 Reminder — MagangHub Kemnaker
 
-[![Python 3.11](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
-[![Platform](https://img.shields.io/badge/Platform-Vercel%20%7C%20Cloudflare%20Workers-black.svg)](https://vercel.com)
-[![Telegram](https://img.shields.io/badge/Telegram%20Bot-@Cekad__bot-2CA5E0.svg)](https://t.me/Cekad_bot)
+Bot Telegram untuk membantu memantau status presensi dan logbook MagangHub Kemnaker (SIAPkerja). Aplikasi ini menggunakan Python standard library, endpoint serverless Vercel, Cloudflare Worker sebagai jalur koneksi opsional, serta webhook Telegram.
+
+> **Penting:** Gunakan aplikasi ini hanya untuk akun dan aktivitas yang memang menjadi hak Anda. Pastikan seluruh data presensi, lokasi, dan logbook yang dikirim sesuai kondisi sebenarnya serta mematuhi kebijakan MagangHub/Kemnaker. Jangan menyimpan kredensial di repository publik.
+
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Vercel](https://img.shields.io/badge/Deploy-Vercel-black.svg?logo=vercel)](https://vercel.com/)
+[![Cloudflare Workers](https://img.shields.io/badge/Proxy-Cloudflare%20Workers-F38020.svg?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
+[![Telegram](https://img.shields.io/badge/Telegram-@Cekad__bot-2CA5E0.svg?logo=telegram&logoColor=white)](https://t.me/Cekad_bot)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Dependencies](https://img.shields.io/badge/Dependencies-Zero%20(Stdlib)-success.svg)](#arsitektur-sistem)
-
-Sistem otomatisasi pemantauan kehadiran, notifikasi pengingat, dan pencatatan presensi serta logbook cadangan untuk portal MagangHub Kemnaker (SIAPkerja). Dibangun dengan arsitektur hibrida berbasis Cloudflare Workers (penjadwalan cron dan reverse proxy) dan Vercel Serverless (backend Python 3.11) yang terintegrasi dengan bot Telegram 24/7.
-
----
 
 ## Daftar Isi
 
-- [Arsitektur Sistem](#arsitektur-sistem)
-- [Jadwal Otomatisasi (Cron Job)](#jadwal-otomatisasi-cron-job)
-- [Fitur Utama](#fitur-utama)
-- [Daftar Perintah Telegram Bot](#daftar-perintah-telegram-bot)
+- [Gambaran Umum](#gambaran-umum)
+- [Arsitektur](#arsitektur)
+- [Fitur](#fitur)
+- [Jadwal Otomatisasi](#jadwal-otomatisasi)
+- [Perintah Telegram](#perintah-telegram)
 - [Struktur Proyek](#struktur-proyek)
-- [Variabel Lingkungan (Environment Variables)](#variabel-lingkungan-environment-variables)
-- [Panduan Instalasi dan Deployment](#panduan-instalasi-dan-deployment)
-  - [1. Konfigurasi Backend di Vercel](#1-konfigurasi-backend-di-vercel)
-  - [2. Konfigurasi Cloudflare Worker](#2-konfigurasi-cloudflare-worker)
-  - [3. Setup Webhook Telegram](#3-setup-webhook-telegram)
-  - [4. Pengujian di Lingkungan Lokal](#4-pengujian-di-lingkungan-lokal)
-- [Mekanisme Anti-Deteksi dan Keamanan](#mekanisme-anti-deteksi-dan-keamanan)
-- [Pertanyaan Umum dan Pemecahan Masalah](#pertanyaan-umum-dan-pemecahan-masalah)
+- [Konfigurasi Environment](#konfigurasi-environment)
+- [Instalasi Lokal](#instalasi-lokal)
+- [Deployment](#deployment)
+  - [Vercel](#deployment-vercel)
+  - [Cloudflare Worker](#deployment-cloudflare-worker)
+  - [Webhook Telegram](#mengaktifkan-webhook-telegram)
+- [Pengujian dan Diagnostik](#pengujian-dan-diagnostik)
+- [Keamanan dan Batasan](#keamanan-dan-batasan)
+- [Pemecahan Masalah](#pemecahan-masalah)
 - [Lisensi](#lisensi)
 
 ---
 
-## Arsitektur Sistem
+## Gambaran Umum
 
-Sistem memisahkan tanggung jawab operasional menjadi tiga komponen utama: penjadwalan waktu, jembatan jaringan, dan backend pemrosesan data.
+Monev ADE7 Reminder menyediakan:
+
+- pemeriksaan status presensi hari ini secara read-only;
+- autentikasi SSO Kemnaker dan caching token sementara;
+- pengisian presensi dan daily log melalui fungsi terpusat;
+- notifikasi status melalui Telegram;
+- auto-retry pada jadwal pemantauan sore dan malam apabila presensi belum tercatat;
+- rekapitulasi presensi tujuh hari terakhir;
+- pilihan kegiatan kustom melalui perintah `/isi <kegiatan>`;
+- Cloudflare Worker opsional untuk meneruskan request ke layanan Kemnaker;
+- proteksi akhir pekan, deduplikasi update Telegram, dan debounce trigger agar proses tidak dijalankan berulang.
+
+Aplikasi tidak menggunakan framework Python pihak ketiga. Dependensi runtime utama berasal dari standard library seperti `urllib`, `http.cookiejar`, `json`, `os`, `tempfile`, dan `datetime`.
+
+## Arsitektur
 
 ```mermaid
-flowchart TD
-    subgraph Cloudflare["Cloudflare Worker (Edge)"]
-        CF_Cron["Scheduled Cron Triggers\n(09:00, 15:00, 19:00, 20:00, 21:00 WIB)"]
-        CF_Proxy["Reverse Proxy\n(Bypass 403 / WAF Kemnaker)"]
-    end
-
-    subgraph Vercel["Vercel Serverless (Region sin1)"]
-        CronEndpoint["api/cron.py\n(Webhook Receiver & Handler)"]
-        MonevCore["monev_bot.py\n(SSO, Template Rotator, Business Logic)"]
-    end
-
-    subgraph Kemnaker["Infrastruktur Kemnaker"]
-        SSO["account.kemnaker.go.id\n(Autentikasi SIAPkerja)"]
-        MonevAPI["monev-api.maganghub.kemnaker.go.id\n(API Presensi & Daily Log)"]
-    end
-
-    subgraph Telegram["Platform Telegram"]
-        User(["Pengguna"])
-        TGBot["Bot @Cekad_bot"]
-    end
-
-    %% Cron Trigger Flow
-    CF_Cron -- "HTTP GET /api/cron?type=..." --> CronEndpoint
-    CronEndpoint --> MonevCore
-
-    %% Telegram Interaction Flow
-    User -- "Kirim Perintah / Klik Tombol" --> TGBot
-    TGBot -- "Webhook POST /api/cron" --> CronEndpoint
-    CronEndpoint -- "Respon Pesan" --> TGBot
-
-    %% Core to Kemnaker via Proxy
-    MonevCore -- "Request SSO / Presensi (Bypass Blokir IP)" --> CF_Proxy
-    CF_Proxy --> SSO
-    CF_Proxy --> MonevAPI
-    MonevCore -- "Kirim Notifikasi" --> TGBot
-    TGBot --> User
+flowchart LR
+    TG[Telegram User] -->|Webhook POST| V[Vercel /api/cron.py]
+    C[Cloudflare Cron] -->|GET status atau auto| V
+    V --> B[monev_bot.py]
+    B -->|Opsional| W[Cloudflare Worker]
+    B -->|Notifikasi| TG
+    W --> SSO[account.kemnaker.go.id]
+    W --> API[monev-api.maganghub.kemnaker.go.id]
+    B -. direct atau proxy .-> SSO
+    B -. direct atau proxy .-> API
 ```
 
-### Integrasi Cloudflare Worker dan Vercel
+### Komponen
 
-1. **Cloudflare Worker**:
-   - Berfungsi sebagai pemicu waktu (cron scheduler) yang mengeksekusi request secara tepat waktu tanpa antrean proses.
-   - Berfungsi sebagai Reverse Proxy untuk meneruskan request ke server Kemnaker guna mencegah pemblokiran alamat IP pusat data Vercel (HTTP 403 Forbidden).
-2. **Vercel Serverless**:
-   - Menjalankan lingkungan Python 3.11 untuk memproses autentikasi SSO, verifikasi presensi, rotasi template kegiatan, dan penerima webhook pesan dari Telegram.
+- **`api/cron.py`** — handler Vercel untuk webhook Telegram, setup webhook, endpoint status, endpoint auto-monev, dan diagnostik.
+- **`monev_bot.py`** — autentikasi, client API, pemeriksaan presensi, pemilihan template, submit daily log, notifikasi, dan rekap.
+- **Cloudflare Worker** — reverse proxy opsional dan scheduler Cloudflare Cron.
+- **Telegram** — antarmuka interaktif untuk menjalankan pemeriksaan dan tindakan manual.
 
----
+## Fitur
 
-## Jadwal Otomatisasi (Cron Job)
+- **Guard check:** memeriksa presensi hari ini sebelum mengirim data baru.
+- **SSO dan cache token:** token disimpan sementara di memori dan direktori temporary runtime; token kedaluwarsa akan memicu login ulang.
+- **Template logbook:** memilih template yang belum tercatat pada `used_templates.json` dan melakukan sinkronisasi terbatas dengan riwayat daily log.
+- **Kegiatan kustom:** mengirim aktivitas yang diberikan pengguna melalui `/isi <kegiatan>` setelah konfirmasi.
+- **Kontrol Telegram:** hanya `TELEGRAM_CHAT_ID` yang diizinkan jika variabel tersebut dikonfigurasi.
+- **Proteksi webhook:** dukungan `TELEGRAM_WEBHOOK_SECRET` untuk memvalidasi header webhook Telegram.
+- **Proteksi cron:** dukungan `CRON_SECRET` untuk endpoint `auto` dan setup webhook.
+- **Deduplication dan debounce:** update Telegram duplikat dilewati dan trigger yang sama dikunci selama 15 menit.
+- **Weekend protection:** jadwal otomatis tidak menjalankan status, pengingat, atau auto-monev pada Sabtu dan Minggu kecuali dipaksa secara eksplisit untuk pengujian.
 
-Seluruh waktu operasional disinkronkan dengan zona Waktu Indonesia Barat (WIB, UTC+7):
+## Jadwal Otomatisasi
 
-| Waktu (WIB) | Cron (UTC) | Tipe Eksekusi | Deskripsi Operasional |
-| :---: | :---: | :---: | :--- |
-| **09:00 WIB** | `0 2 * * 1-5` | `status (pagi)` | Pemeriksaan koneksi SSO Kemnaker dan laporan status presensi pagi (Senin–Jumat). |
-| **15:00 WIB** | `0 8 * * 1-5` | `auto` | **Eksekusi Utama Auto-Monev**: Mengisi absensi dan logbook harian otomatis (Senin–Jumat). |
-| **18:00 WIB** | `0 11 * * 1-5` | `status (sore)` | Cek status kehadiran sore. Jika belum monev, otomatis melakukan **auto-retry submit** & laporkan hasilnya (Senin–Jumat). |
-| **21:00 WIB** | `0 14 * * 1-5` | `status (malam)` | Evaluasi kehadiran malam. Menampilkan **cuplikan kegiatan (8-12 kata)**. Jika belum terisi, otomatis **auto-retry** & peringatan darurat (Senin–Jumat). |
+Semua waktu di bawah menggunakan WIB (UTC+7). Cron Cloudflare menggunakan UTC.
 
-> **Catatan Akhir Pekan (Sabtu & Minggu):** Seluruh cron, auto-monev, pengingat, dan notifikasi status dinonaktifkan total (100% hening/tanpa pesan).
+| Waktu WIB | Cron UTC | Mode | Perilaku |
+|:---:|:---:|:---|:---|
+| 09:00, Senin–Jumat | `0 2 * * 1-5` | `status&waktu=pagi` | Memeriksa koneksi, SSO, dan status presensi. |
+| 15:00, Senin–Jumat | `0 8 * * 1-5` | `auto` | Menjalankan auto-monev jika presensi belum tercatat. |
+| 18:00, Senin–Jumat | `0 11 * * 1-5` | `status&waktu=sore` | Memeriksa status dan mencoba auto-retry jika masih kosong. |
+| 21:00, Senin–Jumat | `0 14 * * 1-5` | `status&waktu=malam` | Pemeriksaan terakhir, cuplikan kegiatan, dan auto-retry bila diperlukan. |
 
----
+`vercel.json` saat ini mengonfigurasi fallback Vercel Cron untuk mode `auto` pada `0 8 * * 1-5`. Jadwal status lainnya dijalankan melalui Cloudflare Worker atau trigger eksternal yang Anda konfigurasi.
 
-## Fitur Utama
+> **Akhir pekan:** handler menolak proses otomatis pada Sabtu dan Minggu dengan respons `weekend_skipped`, kecuali parameter `force` digunakan secara sengaja.
 
-- **Zero External Dependencies**: Menggunakan pustaka standar Python bawaan (`urllib`, `http.cookiejar`, `json`, `os`, `time`, `random`) tanpa memerlukan instalasi modul pihak ketiga.
-- **Autentikasi SSO Otomatis & Caching Token**: Mendukung siklus login SSO SIAPkerja multi-langkah (validasi cookie, token CSRF, dan callback handshake) disertai penyimpanan cache token lokal dengan batas waktu aktif (TTL) hingga 5.5 jam.
-- **Validasi Kehadiran Mandiri (Guard Check)**: Sistem selalu memverifikasi status presensi di server Kemnaker terlebih dahulu. Apabila data kehadiran hari bersangkutan sudah berstatus `PRESENT`, sistem tidak akan melakukan penimpaan data.
-- **Koleksi Template Kegiatan Non-Duplikasi**: Dilengkapi 40 variasi template logbook aktivitas harian yang 100% berfokus pada rekayasa & pengembangan aplikasi web ARFF YIA. Setiap template yang telah digunakan dicatat ke dalam `used_templates.json` serta diverifikasi silang langsung ke Kemnaker sehingga tidak terjadi pengulangan kegiatan.
-- **Simulasi Deviasi Koordinat (GPS Jittering)**: Koordinat presensi diberi deviasi mikro natural secara acak (rentang 10 hingga 25 meter) agar posisi presensi tidak terdeteksi sebagai koordinat statis.
-- **Mekanisme Debounce (15 Menit)**: Mencegah eksekusi ganda apabila terjadi pemicuan berulang dalam interval waktu yang berdekatan.
-- **Proteksi Akhir Pekan Total (Full Weekend Inactive)**: Auto-Monev, pengingat, status monitoring, dan cron job dinonaktifkan total pada hari Sabtu dan Minggu (tidak ada aktivitas maupun pesan Telegram sama sekali).
-- **Antarmuka Bot Interaktif**: Dilengkapi menu tombol inline pada Telegram untuk mempermudah pengecekan status dan konfirmasi tindakan.
+## Perintah Telegram
 
----
-
-## Daftar Perintah Telegram Bot
-
-Berikut daftar perintah yang didukung oleh bot Telegram `@Cekad_bot`:
+Bot default yang digunakan proyek ini adalah [`@Cekad_bot`](https://t.me/Cekad_bot).
 
 | Perintah | Fungsi |
-| :--- | :--- |
-| `/start`, `/help` | Menampilkan ringkasan sistem, bantuan, dan menu tombol utama. |
-| `/cek`, `/status` | Memeriksa status presensi hari ini tanpa mengubah data. |
-| `/tes` | Menjalankan uji diagnostik koneksi SSO Kemnaker dan status proxy. |
-| `/sisa`, `/template` | Menampilkan informasi total template, template terpakai, dan sisa template. |
-| `/rekap` | Menampilkan rekapitulasi kehadiran 7 hari terakhir beserta status persetujuan mentor. |
-| `/isi <kegiatan>` | Mengisi presensi hari ini menggunakan teks kegiatan khusus dari obrolan. |
-| `/monev` | Menjalankan pengisian presensi hari ini dengan dialog konfirmasi terlebih dahulu. |
-| `/proxy` | Menampilkan status dan endpoint Cloudflare Reverse Proxy yang sedang aktif. |
-
----
+|:---|:---|
+| `/start`, `/help`, `/bantuan` | Menampilkan menu utama dan tombol interaktif. |
+| `/cek`, `/status` | Memeriksa status presensi hari ini tanpa submit data. |
+| `/tes` | Menguji koneksi SSO, API, dan jalur proxy tanpa submit presensi. |
+| `/monev` | Membuka dialog konfirmasi untuk pengisian otomatis. |
+| `/isi <kegiatan>` | Membuka dialog konfirmasi untuk mengirim kegiatan kustom. |
+| `/rekap` | Menampilkan ringkasan presensi tujuh hari terakhir. |
+| `/sisa`, `/template`, `/templates` | Menampilkan jumlah template terpakai dan tersisa. |
+| `/proxy` | Menampilkan status `CLOUDFLARE_WORKER_URL`. |
+| `ya`, `/ya` | Mengonfirmasi tindakan yang sedang menunggu konfirmasi. |
+| `/batal`, `/tidak` | Membatalkan tindakan yang sedang menunggu konfirmasi. |
 
 ## Struktur Proyek
 
 ```text
 monev/
 ├── api/
-│   └── cron.py                 # Endpoint serverless Vercel (Webhook & Cron Handler)
-├── .github/
-│   └── workflows/
-│       └── monev_cron.yml      # Workflow cadangan (GitHub Actions)
-├── cloudflare_worker.js        # Script Cloudflare Worker (Cron Trigger & Reverse Proxy)
-├── monev_bot.py                # Mesin utama: SSO Kemnaker, API client, template engine
-├── telegram_polling.py         # Skrip pengujian interaksi bot lokal via polling
-├── templates.json              # Koleksi 40 template aktivitas pengembangan aplikasi, pembelajaran, dan kendala
-├── reminder_templates.json     # Variasi teks notifikasi pengingat harian
-├── used_templates.json         # Log riwayat template kegiatan yang telah digunakan
-├── wrangler.toml               # Konfigurasi deployment Cloudflare Worker
-├── vercel.json                 # Konfigurasi deployment runtime Vercel
-├── requirements.txt            # Daftar dependensi Python
-└── README.md                   # Dokumentasi teknis proyek
+│   └── cron.py                 # Handler Vercel: webhook, status, auto, dan diagnostik
+├── tests/                      # Pengujian proyek
+├── .env.example                # Contoh konfigurasi environment
+├── .github/                    # Konfigurasi GitHub
+├── cloudflare_worker.js        # Reverse proxy dan Cloudflare Cron handler
+├── monev_bot.py                # Logika utama aplikasi
+├── telegram_polling.py         # Pengujian bot lokal menggunakan polling
+├── templates.json              # Template kegiatan, pembelajaran, dan kendala
+├── reminder_templates.json     # Variasi pesan pengingat/status
+├── used_templates.json         # Riwayat template yang telah dipakai
+├── pyproject.toml              # Metadata proyek dan entrypoint Vercel
+├── requirements.txt            # Daftar dependensi proyek
+├── vercel.json                 # Konfigurasi Vercel
+├── wrangler.toml               # Konfigurasi Cloudflare Worker
+├── README_BOT.md               # Dokumentasi ringkas bot
+└── README.md                   # Dokumentasi utama
 ```
 
----
+## Konfigurasi Environment
 
-## Variabel Lingkungan (Environment Variables)
+Salin `.env.example` menjadi `.env` untuk pengujian lokal. Untuk deployment, masukkan variabel yang sama melalui pengaturan environment platform masing-masing.
 
-Variabel-variabel berikut harus dikonfigurasikan pada file `.env` untuk penggunaan lokal atau pada menu **Environment Variables** di dasbor Vercel:
+| Variabel | Wajib | Keterangan |
+|:---|:---:|:---|
+| `KEMNAKER_USERNAME` | Ya | NIK atau username akun SIAPkerja. |
+| `KEMNAKER_PASSWORD` | Ya | Password akun SIAPkerja. |
+| `OFFICE_LAT` | Ya | Latitude lokasi presensi yang sah. |
+| `OFFICE_LONG` | Ya | Longitude lokasi presensi yang sah. |
+| `TELEGRAM_BOT_TOKEN` | Ya | Token bot dari `@BotFather`. |
+| `TELEGRAM_CHAT_ID` | Ya | Chat ID Telegram yang diizinkan menerima dan menjalankan bot. |
+| `CLOUDFLARE_WORKER_URL` | Disarankan | URL Worker jika koneksi Kemnaker perlu diteruskan melalui Cloudflare. |
+| `CRON_SECRET` | Disarankan | Secret untuk melindungi endpoint `auto` dan setup webhook. |
+| `TELEGRAM_WEBHOOK_SECRET` | Disarankan | Secret untuk validasi header webhook Telegram. |
+| `KEMNAKER_BEARER_TOKEN` | Opsional | Token Bearer manual; gunakan hanya jika memang tersedia dan dikelola secara aman. |
 
-| Nama Variabel | Status | Deskripsi |
-| :--- | :---: | :--- |
-| `KEMNAKER_USERNAME` | Wajib | Nomor Identitas Kependudukan (NIK) akun SIAPkerja Kemnaker. |
-| `KEMNAKER_PASSWORD` | Wajib | Kata sandi akun SIAPkerja Kemnaker. |
-| `OFFICE_LAT` | Wajib | Titik koordinat Latitude lokasi magang (contoh: `-7.8981812`). |
-| `OFFICE_LONG` | Wajib | Titik koordinat Longitude lokasi magang (contoh: `110.0499084`). |
-| `TELEGRAM_BOT_TOKEN` | Wajib | Token otorisasi bot yang diperoleh dari `@BotFather`. |
-| `TELEGRAM_CHAT_ID` | Wajib | ID akun Telegram pengguna penerima laporan. |
-| `CLOUDFLARE_WORKER_URL`| Wajib | URL publik Cloudflare Worker (contoh: `https://monev-proxy.user.workers.dev`). |
-| `CRON_SECRET` | Opsional | Kunci autentikasi tambahan untuk membatasi eksekusi endpoint cron. |
+Contoh konfigurasi tersedia di [`.env.example`](.env.example). Jangan commit file `.env` atau token aktif.
 
----
+## Instalasi Lokal
 
-## Panduan Instalasi dan Deployment
+### Prasyarat
 
-### 1. Konfigurasi Backend di Vercel
+- Python 3.11 atau lebih baru;
+- akun SIAPkerja/MagangHub yang sah;
+- bot Telegram dari `@BotFather`;
+- kredensial Cloudflare/Vercel jika melakukan deployment.
 
-1. Hubungkan repositori ini ke proyek baru pada [Vercel](https://vercel.com).
-2. Masuk ke menu **Settings** > **Environment Variables**, lalu daftarkan seluruh variabel lingkungan yang diperlukan sesuai tabel di atas.
-3. Jalankan proses deployment. Vercel akan membaca konfigurasi `vercel.json` dan mempublikasikan endpoint `api/cron.py`.
-
-### 2. Konfigurasi Cloudflare Worker
-
-1. Masuk ke [Cloudflare Dashboard](https://dash.cloudflare.com) > **Workers & Pages** > **Create Worker**.
-2. Beri nama worker (misalnya `monev-proxy`), lalu klik **Deploy**.
-3. Buka menu **Quick Edit**, masukkan seluruh kode dari berkas `cloudflare_worker.js`, kemudian simpan dan terapkan.
-4. Pada tab **Settings** > **Triggers**, ekspresi cron yang aktif adalah:
-   - `0 2 * * *` (09:00 WIB - Monitoring Pagi)
-   - `0 8 * * *` (15:00 WIB - Auto Monev Utama)
-   - `0 11 * * *` (18:00 WIB - Cek Monev Jam 6 Sore & Retry)
-   - `0 14 * * *` (21:00 WIB - Cek Monev Jam 9 Malam & Preview)
-5. Pada tab **Settings** > **Variables**, konfigurasikan variabel:
-   - `VERCEL_DOMAIN` = URL deployment Vercel Anda (contoh: `https://monev-wine.vercel.app`)
-   - `CRON_SECRET` = Kunci rahasia cron (jika menggunakan pengaman)
-6. Salin domain worker yang diperoleh dan masukkan ke variabel `CLOUDFLARE_WORKER_URL` pada Vercel.
-
-*(Alternatif: Gunakan Wrangler CLI dengan perintah `npx wrangler deploy`)*.
-
-### 3. Setup Webhook Telegram
-
-Untuk menghubungkan bot Telegram dengan serverless endpoint di Vercel, buka peramban dan akses URL berikut:
-
-```text
-https://monev-wine.vercel.app/api/cron?setup=1
-```
-
-Sistem akan memberikan respon konfirmasi bahwa webhook telah terdaftar secara aktif.
-
-### 4. Pengujian di Lingkungan Lokal
-
-Untuk menjalankan pengujian diagnostik secara lokal:
+### Langkah instalasi
 
 ```bash
-# 1. Menjalankan pengujian koneksi SSO dan profil peserta
+git clone https://github.com/ade781/monev.git
+cd monev
+
+cp .env.example .env
+# Edit .env dan isi nilai yang benar
+
+python --version
+python -m unittest discover -s tests -v
+```
+
+`requirements.txt` tidak memerlukan package eksternal. Jika ingin menggunakan virtual environment:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+# .venv\\Scripts\\activate       # Windows PowerShell
+
+python -m unittest discover -s tests -v
+```
+
+## Deployment
+
+### Deployment Vercel
+
+1. Import repository `ade781/monev` ke Vercel.
+2. Pastikan runtime Python membaca entrypoint `api/cron.py`.
+3. Tambahkan environment variables pada **Settings → Environment Variables**.
+4. Deploy project.
+5. Catat URL deployment, misalnya `https://nama-project.vercel.app`.
+6. Jika menggunakan `CRON_SECRET`, pastikan secret yang sama tersedia pada pemanggil cron.
+
+Konfigurasi `vercel.json` menetapkan region `sin1`, durasi fungsi maksimum 60 detik, dan satu Vercel Cron untuk mode `auto`.
+
+### Deployment Cloudflare Worker
+
+Cloudflare Worker bersifat opsional. Gunakan jika Anda membutuhkan reverse proxy atau ingin menjalankan scheduler Cloudflare.
+
+Dengan Wrangler:
+
+```bash
+npx wrangler login
+npx wrangler deploy
+```
+
+Konfigurasi scheduler berada di [`wrangler.toml`](wrangler.toml):
+
+```toml
+[triggers]
+crons = ["0 2 * * 1-5", "0 8 * * 1-5", "0 11 * * 1-5", "0 14 * * 1-5"]
+```
+
+Atur variable Worker berikut melalui dashboard Cloudflare atau Wrangler:
+
+- `VERCEL_DOMAIN` — URL deployment Vercel tanpa slash penutup;
+- `CRON_SECRET` — gunakan nilai yang sama dengan Vercel jika endpoint dilindungi.
+
+Kemudian masukkan URL Worker ke `CLOUDFLARE_WORKER_URL` di Vercel.
+
+> Worker meneruskan URL target melalui parameter query `url`. Batasi penggunaan Worker pada endpoint yang memang diperlukan dan jangan menjadikannya proxy publik tanpa kontrol akses.
+
+### Mengaktifkan Webhook Telegram
+
+Setelah deployment Vercel selesai, aktifkan webhook dengan membuka endpoint berikut. Jika `CRON_SECRET` diaktifkan, sertakan secret sebagai query parameter atau gunakan header Authorization.
+
+```text
+https://<domain-vercel-anda>/api/cron?setup=1
+```
+
+Dengan secret melalui query parameter:
+
+```text
+https://<domain-vercel-anda>/api/cron?setup=1&secret=<CRON_SECRET>
+```
+
+Respons akan berisi URL webhook dan hasil dari Telegram Bot API. Setelah berhasil, kirim `/start` ke bot.
+
+## Pengujian dan Diagnostik
+
+### Cek koneksi SSO dan profil
+
+```bash
 python -c "import monev_bot; print(monev_bot.test_koneksi_sistem())"
+```
 
-# 2. Menjalankan verifikasi status kehadiran hari ini
+### Cek status presensi hari ini
+
+```bash
 python -c "import monev_bot; print(monev_bot.format_status_presensi())"
+```
 
-# 3. Menjalankan bot Telegram lokal via polling
+### Menjalankan polling Telegram secara lokal
+
+```bash
 python telegram_polling.py --force
 ```
 
----
+### Diagnostik melalui endpoint Vercel
 
-## Mekanisme Anti-Deteksi dan Keamanan
-
-1. **Variasi Koordinat Acak (GPS Jitter)**:
-   Perhitungan koordinat menggunakan penambahan nilai acak kontinu dalam batas radius wajar:
-   $$\text{Latitude}_{\text{baru}} = \text{Latitude}_{\text{asli}} \pm \text{Random}(-0.00015, 0.00015)$$
-   $$\text{Longitude}_{\text{baru}} = \text{Longitude}_{\text{asli}} \pm \text{Random}(-0.00015, 0.00015)$$
-2. **Rotasi Logbook Harian**:
-   Deskripsi tugas, pembelajaran, dan kendala dipilih secara rotasional dari 35 basis data template teknis, memastikan tidak ada kesamaan teks pada dua hari yang berurutan.
-3. **Penyimpanan Cache Token SSO**:
-   Token akses disimpan sementara dalam direktori cache lokal untuk mengurangi frekuensi pengiriman request login berulang yang berpotensi memicu batasan kuota request (*rate limiting*).
-4. **Validasi Hak Akses Telegram**:
-   Setiap permintaan interaksi Telegram memvalidasi kesesuaian parameter `chat_id`. Permintaan dari pengguna yang tidak terdaftar akan langsung diabaikan.
-
----
-
-## Pertanyaan Umum dan Pemecahan Masalah
-
-**1. Mengapa presensi otomatis tidak langsung terisi pada pukul 09:00 WIB?**  
-Pukul 09:00 WIB dan 15:00 WIB merupakan jadwal monitoring dan pelaporan status. Eksekusi pengisian presensi otomatis cadangan dijadwalkan pada pukul 21:00 WIB sebagai batas pengaman terakhir jika presensi belum diisi secara mandiri.
-
-**2. Bagaimana prosedur menambahkan template kegiatan baru?**  
-Buka berkas `templates.json` dan tambahkan data dengan struktur berikut:
-```json
-{
-  "id": 36,
-  "category": "it_support",
-  "activity": "Deskripsi kegiatan teknis yang dilakukan.",
-  "learning": "Pembelajaran teknis yang diperoleh.",
-  "obstacles": "Kendala teknis yang dihadapi atau penanganan kendala."
-}
+```text
+https://<domain-vercel-anda>/api/cron?test=1
 ```
 
-**3. Apa yang terjadi jika server Kemnaker mengalami gangguan koneksi?**  
-Sistem proxy Cloudflare Worker menerapkan mekanisme pengulangan otomatis (retry) sebanyak 2 kali dengan jeda waktu 3 detik dan batas waktu tunggu 55 detik. Apabila koneksi tetap gagal, sistem akan mengirimkan notifikasi rincian kendala ke Telegram.
+Endpoint ini memeriksa kesehatan koneksi dan tidak dimaksudkan untuk mengirim presensi.
 
----
+## Keamanan dan Batasan
+
+- Simpan `KEMNAKER_PASSWORD`, token Telegram, Bearer token, dan secret webhook hanya di environment variables.
+- Jangan mencetak token ke log atau memasukkannya ke issue, commit, screenshot, maupun README.
+- Atur `TELEGRAM_CHAT_ID` agar bot tidak merespons pengguna yang tidak berwenang.
+- Aktifkan `TELEGRAM_WEBHOOK_SECRET` untuk memvalidasi request webhook Telegram.
+- Aktifkan `CRON_SECRET` agar endpoint `auto` dan setup webhook tidak terbuka tanpa autentikasi.
+- Runtime serverless memiliki filesystem yang sementara. Cache token, lock trigger, dan riwayat template dapat hilang ketika instance dibuat ulang; jangan menganggap filesystem `/tmp` sebagai penyimpanan permanen.
+- Periksa kembali data lokasi dan isi logbook sebelum submit. Fitur otomatisasi tidak menggantikan kewajiban pengguna untuk memastikan data presensi benar.
+- Endpoint proxy dan endpoint diagnostik dapat membocorkan informasi operasional jika dibiarkan tanpa pembatasan. Gunakan secret, domain yang tepat, dan prinsip least privilege.
+
+## Pemecahan Masalah
+
+### `401 Unauthorized` pada endpoint `auto` atau setup webhook
+
+Pastikan nilai `CRON_SECRET` di Vercel dan Cloudflare sama. Jika secret aktif, request harus menyertakan:
+
+```text
+?secret=<CRON_SECRET>
+```
+
+atau header:
+
+```text
+Authorization: Bearer <CRON_SECRET>
+```
+
+### Webhook Telegram tidak menerima pesan
+
+1. Pastikan `TELEGRAM_BOT_TOKEN` benar.
+2. Jalankan kembali endpoint setup webhook.
+3. Pastikan `TELEGRAM_WEBHOOK_SECRET` di Vercel sama dengan secret yang dipakai saat mendaftarkan webhook.
+4. Pastikan URL deployment dapat diakses melalui HTTPS.
+5. Kirim `/start` setelah webhook berhasil.
+
+### Koneksi Kemnaker gagal atau menerima HTTP 403
+
+1. Jalankan `/tes` atau endpoint `?test=1`.
+2. Periksa `CLOUDFLARE_WORKER_URL`.
+3. Pastikan Worker sudah aktif dan `VERCEL_DOMAIN` mengarah ke deployment yang benar.
+4. Periksa log Vercel dan Cloudflare.
+5. Pastikan layanan Kemnaker sedang dapat diakses dan kredensial masih valid.
+
+### Template tidak berkurang atau riwayat hilang
+
+Filesystem serverless tidak persisten. `used_templates.json` dapat ditulis ke direktori temporary ketika root project read-only. Untuk kebutuhan riwayat permanen, gunakan storage eksternal yang sesuai dan jangan menaruh kredensial di file repository.
 
 ## Lisensi
 
