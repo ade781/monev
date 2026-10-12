@@ -73,7 +73,7 @@ flowchart LR
 
 - **Guard check:** memeriksa presensi hari ini sebelum mengirim data baru.
 - **SSO dan cache token:** token disimpan sementara di memori dan direktori temporary runtime; token kedaluwarsa akan memicu login ulang.
-- **Template logbook:** memilih template yang belum tercatat pada `used_templates.json` dan melakukan sinkronisasi terbatas dengan riwayat daily log.
+- **Template logbook:** memilih template yang belum tercatat pada `used_templates.json` dari koleksi 50 template aktivitas rekayasa aplikasi web ARFF YIA non-duplikasi dan melakukan sinkronisasi terbatas dengan riwayat daily log.
 - **Kegiatan kustom:** mengirim aktivitas yang diberikan pengguna melalui `/isi <kegiatan>` setelah konfirmasi.
 - **Kontrol Telegram:** hanya `TELEGRAM_CHAT_ID` yang diizinkan jika variabel tersebut dikonfigurasi.
 - **Proteksi webhook:** dukungan `TELEGRAM_WEBHOOK_SECRET` untuk memvalidasi header webhook Telegram.
@@ -125,7 +125,7 @@ monev/
 ├── cloudflare_worker.js        # Reverse proxy dan Cloudflare Cron handler
 ├── monev_bot.py                # Logika utama aplikasi
 ├── telegram_polling.py         # Pengujian bot lokal menggunakan polling
-├── templates.json              # Template kegiatan, pembelajaran, dan kendala
+├── templates.json              # Koleksi 50 template aktivitas pengembangan aplikasi, pembelajaran, dan kendala
 ├── reminder_templates.json     # Variasi pesan pengingat/status
 ├── used_templates.json         # Riwayat template yang telah dipakai
 ├── pyproject.toml              # Metadata proyek dan entrypoint Vercel
@@ -261,6 +261,12 @@ python -c "import monev_bot; print(monev_bot.format_status_presensi())"
 
 ```bash
 python telegram_polling.py --force
+```
+
+### Menjalankan unit test otomatis
+
+```bash
+python -m unittest discover -s tests -v
 ```
 
 ### Diagnostik melalui endpoint Vercel

@@ -278,5 +278,75 @@
     "activity": "Mengonfigurasi alur kerja pengujian dan integrasi berkelanjutan (CI/CD Pipeline Workflow) pada repositori kode aplikasi ARFF YIA menggunakan GitHub Actions. Menyusun tahapan otomatis yang menjalankan linting kode (ESLint), validasi pengetikan tipe data, eksekusi seluruh unit test Jest, serta verifikasi build produksi bundle frontend setiap kali ada kode baru yang di-push ke branch utama.",
     "learning": "Menguasai prinsip Continuous Integration (CI), otomatisasi quality gate untuk mencegah regresi bug pada kode produksi, serta pengelolaan rahasia lingkungan (repository secrets) dalam alur kerja DevOps modern.",
     "obstacles": "Waktu eksekusi pipeline GitHub Actions sempat memakan waktu lebih dari 5 menit akibat instalasi ulang package dependensi dari nol setiap kali berjalan. Masalah ini dipercepat menjadi hanya 1 menit dengan memanfaatkan actions/cache untuk caching folder node_modules."
+  },
+  {
+    "id": 58,
+    "category": "notification_sound_alerts",
+    "activity": "Mengimplementasikan sistem notifikasi audio peringatan darurat (Emergency Audio Alert Chime) berbasis Web Audio API pada aplikasi web ARFF YIA. Membangun pemutar nada dering peringatan berbasis synthesized oscillator frekuensi khusus yang berbunyi ketika inspeksi mendeteksi tabung bertekanan nol (indikasi kebocoran fatal) atau tabung dalam status rusak berat di area vital bandara.",
+    "learning": "Mendalami arsitektur Web Audio API (AudioContext, OscillatorNode, GainNode), kebijakan audio autoplay policy pada peramban web modern, serta perancangan auditory feedback untuk responsivitas situasi darurat.",
+    "obstacles": "Peramban Chrome dan Safari memblokir inisialisasi AudioContext sebelum pengguna melakukan interaksi gestur pertama (klik/sentuh) pada layar. Kendala ini diselesaikan dengan menunda aktivasi audio context hingga interaksi tombol pertama dilakukan pengguna saat memulai sesi inspeksi."
+  },
+  {
+    "id": 59,
+    "category": "csv_data_importer",
+    "activity": "Mengembangkan fitur impor data massal tabung APAR berbasis file CSV/Excel pada antarmuka admin aplikasi ARFF YIA menggunakan library PapaParse. Menyediakan mekanisme pemetaan kolom otomatis, validasi tipe data per baris sebelum penyimpanan, serta penampil pratinjau tabel interaktif yang menyorot baris data bermasalah atau format tanggal kedaluwarsa yang tidak valid.",
+    "learning": "Memahami teknik parsing streaming file teks berukuran besar di sisi browser, validasi skema data tabular (schema validation) sebelum transmisi payload, serta penanganan error parsing per baris secara informatif bagi pengguna.",
+    "obstacles": "File CSV yang diekspor dari aplikasi spreadsheet versi lama dengan pemisah titik koma (semicolon) alih-alih koma sempat memicu kegagalan parsing. Hal ini diatasi dengan menambahkan fungsi auto-detect delimiter pada konfigurasi parser sebelum proses konversi dimulai."
+  },
+  {
+    "id": 60,
+    "category": "gps_offline_caching",
+    "activity": "Menyempurnakan modul geolocation dengan menambahkan fitur caching koordinat lokasi terakhir menggunakan Geolocation API dan IndexedDB pada aplikasi ARFF YIA. Memungkinkan aplikasi tetap menandai estimasi zona posisi inspeksi tabung saat petugas berada di area hanggar tertutup beton tebal atau basement terminal yang mengalami kehilangan sinyal satelit GPS sesaat.",
+    "learning": "Mendalami opsi parameter Geolocation API (enableHighAccuracy, timeout, maximumAge), toleransi presisi koordinat geospasial, serta penanganan fallback posisi saat sinyal GPS terdegradasi di dalam ruangan tertutup.",
+    "obstacles": "Nilai akurasi koordinat (accuracy radius) sempat melebar hingga ratusan meter saat ponsel beralih ke estimasi lokasi berbasis BTS seluler. Solusinya, dibuat filter threshold akurasi maksimal 25 meter sebelum koordinat dinyatakan valid untuk dicatat ke dalam logbook inspeksi."
+  },
+  {
+    "id": 61,
+    "category": "accessibility_wcag",
+    "activity": "Melakukan audit dan peningkatan aksesibilitas antarmuka pengguna (Web Content Accessibility Guidelines / WCAG 2.1 AA) pada seluruh halaman form inspeksi ARFF YIA. Menambahkan atribut ARIA labels, semantic roles, meningkatkan rasio kontras warna teks tombol status di atas 4.5:1, serta memastikan seluruh komponen input dapat dinavigasi secara penuh menggunakan keyboard dan pembaca layar (screen reader).",
+    "learning": "Menguasai prinsip aksesibilitas web modern (perceivable, operable, understandable, robust), implementasi WAI-ARIA authoring practices, serta audit otomatis elemen DOM menggunakan alat Lighthouse dan axe-core.",
+    "obstacles": "Komponen modal dialog kustom sempat menyebabkan fokus keyboard terjebak (focus trap) di luar modal saat tombol Tab ditekan berulang. Masalah ini diselesaikan dengan menyematkan pustaka focus-trap-react yang mengunci pergerakan fokus keyboard hanya di dalam kontainer modal aktif."
+  },
+  {
+    "id": 62,
+    "category": "signature_pad_enhancement",
+    "activity": "Menyempurnakan komponen penandatanganan digital (Digital Signature Pad) pada modul persetujuan Berita Acara ARFF YIA menggunakan HTML5 Canvas. Menambahkan fitur penghalusan goresan kuas (smooth stroke interpolation), tombol pembersihan kanvas cepat, serta fungsi pembungkusan hasil tanda tangan ke format Base64 PNG transparan beresolusi tinggi dengan kompresi ukuran berkas optimal.",
+    "learning": "Mempelajari manipulasi raster 2D canvas context, penanganan koordinat sentuh layar mobile (TouchEvent vs MouseEvent) dengan presisi pixel-ratio retina display, serta serialisasi gambar grafis vektor ke data URL.",
+    "obstacles": "Goresan tanda tangan sempat terlihat patah-patah dan bergerigi pada layar ponsel dengan refresh rate tinggi. Hal ini diperbaiki dengan mengimplementasikan algoritma kurva Bezier kuadratik (quadratic curve smoothing) pada setiap titik koordinat goresan jari."
+  },
+  {
+    "id": 63,
+    "category": "data_sync_conflict_resolution",
+    "activity": "Mengembangkan algoritma penyelesaian konflik data sinkronisasi (Conflict Resolution Strategy) pada modul pencatatan offline aplikasi ARFF YIA. Menerapkan pendekatan Last-Write-Wins yang diperkaya dengan perbandingan versi berbasis vector clock atau hash checksum entitas, sehingga ketika dua petugas memperbarui status tabung yang sama secara simultan, data terbaru tidak menimpa riwayat inspeksi sebelumnya secara keliru.",
+    "learning": "Mendalami konsep arsitektur distributed state synchronization, penanganan race conditions pada aplikasi offline-first, serta perancangan strategi rekonsiliasi data mutasi multi-klien.",
+    "obstacles": "Perbedaan waktu jam internal pada perangkat smartphone petugas sempat mengacaukan penentuan urutan versi pembaruan. Kendala ini diatasi dengan memanfaatkan NTP server time synchronization dari header respons backend sebagai acuan stempel waktu terpusat."
+  },
+  {
+    "id": 64,
+    "category": "bundle_optimization_treeshaking",
+    "activity": "Mengoptimalkan konfigurasi bundler Vite dan menerapkan teknik Tree-Shaking lanjutan pada pustaka ikonografi dan utilitas aplikasi ARFF YIA. Mengganti impor paket monolitik menjadi direct modular subpath imports pada pustaka Lucide React dan date-fns, serta mengaktifkan kompresi aset Brotli dan Gzip pra-build guna memangkas ukuran bundle distribusi produksi hingga 35% lebih ramping.",
+    "learning": "Menguasai teknik analisis dependency graph menggunakan rollup-plugin-visualizer, prinsip kerja dead code elimination (Tree-Shaking) pada modul ECMAScript (ESM), serta konfigurasi kompresi server-ready assets.",
+    "obstacles": "Salah satu dependensi pihak ketiga sempat menyertakan modul CommonJS yang gagal di-tree-shake secara otomatis oleh bundler Vite. Masalah diselesaikan dengan mengonfigurasi optimizeDeps dan mengarahkan alias impor ke versi modul ES modern dari pustaka terkait."
+  },
+  {
+    "id": 65,
+    "category": "dark_mode_theming",
+    "activity": "Merancang dan mengimplementasikan sistem tema gelap adaptif (Adaptive Dark Mode) pada antarmuka aplikasi pelaporan ARFF YIA menggunakan variabel CSS kustom dan Tailwind CSS dark variant. Menyediakan transisi perpindahan tema yang halus tanpa kedipan (flash of unstyled content), serta menyesuaikan kontras elemen visual agar tetap nyaman digunakan petugas operasional pada shift malam di landasan pacu bandara.",
+    "learning": "Memahami pengelolaan token desain (design tokens) dengan CSS Custom Properties, deteksi preferensi sistem operasi pengguna via media query prefers-color-scheme, serta persistensi preferensi tema di local storage.",
+    "obstacles": "Beberapa komponen grafik analitik Canvas pihak ketiga tidak otomatis memperbarui palet warna garis dan label saat mode tema dialihkan secara instan. Solusinya, dipasang watcher state tema di React yang memicu rendering ulang palet warna chart saat tema berganti."
+  },
+  {
+    "id": 66,
+    "category": "input_sanitization_xss",
+    "activity": "Memperkuat sistem sanitasi input data dan pertahanan terhadap kerentanan Cross-Site Scripting (XSS) pada seluruh formulir pelaporan ARFF YIA. Mengintegrasikan pustaka DOMPurify pada sisi render HTML serta validator sanitizer di sisi backend Express.js guna memastikan catatan deskripsi kendala dan temuan lapangan yang dimasukkan petugas bebas dari tag skrip berbahaya atau injeksi karakter khusus.",
+    "learning": "Mendalami taksonomi kerentanan injeksi XSS (Stored, Reflected, DOM-based), prinsip Content Security Policy (CSP), serta teknik sanitasi untrusted user input sebelum diproses dan ditampilkan kembali ke antarmuka aplikasi.",
+    "obstacles": "Proses sanitasi string sempat secara agresif menghapus tanda kurung sudut dan simbol matematika yang sah pada catatan teknis spesifikasi tekanan tabung. Hal ini diperbaiki dengan menyetel whitelist tag dan atribut yang ketat namun fleksibel pada konfigurasi parser DOMPurify."
+  },
+  {
+    "id": 67,
+    "category": "service_worker_lifecycle",
+    "activity": "Mengoptimalkan siklus hidup Service Worker dan mekanisme pembaruan instan (Instant App Update Notification Prompt) pada Progressive Web App (PWA) ARFF YIA. Menyematkan pendeteksi versi rilis baru menggunakan event worker updatefound, serta menampilkan banner notifikasi interaktif yang mengajak petugas memuat ulang aplikasi dengan satu klik agar selalu menggunakan versi kode terbaru tanpa tertinggal cache lama.",
+    "learning": "Menguasai tahapan siklus hidup Service Worker (installing, waiting, active), teknik bypass cache dengan metode self.skipWaiting() dan clients.claim(), serta perancangan UX pembaruan aplikasi PWA yang mulus bagi pengguna akhir.",
+    "obstacles": "Tab peramban yang aktif dalam jumlah banyak sempat menahan Service Worker baru di status waiting sehingga pembaruan tidak kunjung diterapkan. Masalah ini diatasi dengan mengirimkan pesan postMessage 'SKIP_WAITING' dari thread aplikasi utama saat tombol perbarui diklik pengguna."
   }
 ]

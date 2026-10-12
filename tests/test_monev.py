@@ -120,15 +120,15 @@ class TestMonevCore(unittest.TestCase):
         self.assertIn("session_token", cookie_names)
 
     def test_template_stock_and_themes(self):
-        """Uji stok 40 template dan fokus pengembangan aplikasi"""
+        """Uji stok 50 template dan fokus pengembangan aplikasi"""
         templates = monev_bot.muat_semua_template()
-        self.assertEqual(len(templates), 40)
+        self.assertEqual(len(templates), 50)
         
         # Seluruh template harus memiliki ID unik dan non-empty fields
         ids = [t["id"] for t in templates]
         self.assertEqual(len(ids), len(set(ids)))
         self.assertEqual(min(ids), 18)
-        self.assertEqual(max(ids), 57)
+        self.assertEqual(max(ids), 67)
         
         for t in templates:
             self.assertTrue(len(t["activity"]) > 80)
@@ -145,13 +145,17 @@ class TestMonevCore(unittest.TestCase):
                 "data_export_excel", "form_validation_advanced", "search_indexing", "theme_customization",
                 "camera_scanner_enhancement", "database_optimization", "api_rate_limiting",
                 "frontend_routing_guards", "responsive_layout_stepper", "data_security_encryption",
-                "pdf_export_formatting", "performance_image_lazyload", "ci_cd_automation"
+                "pdf_export_formatting", "performance_image_lazyload", "ci_cd_automation",
+                "notification_sound_alerts", "csv_data_importer", "gps_offline_caching",
+                "accessibility_wcag", "signature_pad_enhancement", "data_sync_conflict_resolution",
+                "bundle_optimization_treeshaking", "dark_mode_theming", "input_sanitization_xss",
+                "service_worker_lifecycle"
             ])
 
-        # Sisa template belum terpakai harus tepat 40
+        # Sisa template belum terpakai harus tepat 50
         _, sisa, total = monev_bot.ambil_template_belum_terpakai()
-        self.assertEqual(sisa, 40)
-        self.assertEqual(total, 40)
+        self.assertEqual(sisa, 50)
+        self.assertEqual(total, 50)
 
     def test_weekend_auto_monev_skip(self):
         """Uji auto-monev, status, dan pengingat melewati eksekusi di hari Sabtu dan Minggu tanpa mengirim apapun ke Telegram"""
