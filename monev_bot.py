@@ -204,8 +204,13 @@ def api_call(endpoint, token, method="GET", payload=None):
             return json.loads(res.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            _CACHED_TOKEN = None
-            _clear_cached_token_from_disk()
+            for k, (tok, _) in list(_CACHED_TOKENS.items()):
+                if tok == token:
+                    _CACHED_TOKENS.pop(k, None)
+                    _clear_cached_token_from_disk(k)
+            if _CACHED_TOKEN == token or not _CACHED_TOKENS:
+                _CACHED_TOKEN = None
+                _clear_cached_token_from_disk()
         try:
             err_data = json.loads(e.read().decode("utf-8"))
             msg = err_data.get("message") or err_data.get("error") or str(e)
@@ -696,6 +701,22 @@ def submit_monev(token=None, today_str=None, template=None, custom_activity=None
     return res
 
 
+def is_secondary_pending(today_str=None):
+    """Mengembalikan True jika Akun 2 dikonfigurasi dan belum mengisi presensi hari ini."""
+    u2 = (os.getenv("KEMNAKER_USERNAME_2") or KEMNAKER_USERNAME_2 or "").strip()
+    p2 = (os.getenv("KEMNAKER_PASSWORD_2") or KEMNAKER_PASSWORD_2 or "").strip()
+    if not u2 or not p2:
+        return False
+
+    today_str = today_str or datetime.now(WIB).strftime("%Y-%m-%d")
+    try:
+        token2 = login_kemnaker(username=u2, password=p2)
+        sudah2, _ = periksa_absen_hari_ini(token2, today_str)
+        return not sudah2
+    except Exception:
+        return False
+
+
 def sync_secondary_account(today_str=None, template=None, custom_activity=None, force=False, readonly=False):
     """Menjalankan cek/submit minimal untuk akun ke-2 (KEMNAKER_USERNAME_2) dan mengembalikan 1 baris ringkas."""
     u2 = (os.getenv("KEMNAKER_USERNAME_2") or KEMNAKER_USERNAME_2 or "").strip()
@@ -1031,7 +1052,7 @@ def main(force=False, notify_telegram=False):
     try:
         token = login_kemnaker()
         sudah, data_absen = periksa_absen_hari_ini(token, today_str)
-        if sudah and not force:
+        if sudah:
             sec_template = None
             try:
                 logs = api_call(f"https://monev-api.maganghub.kemnaker.go.id/api/v1/daily-logs?date={today_str}", token).get("data", [])
@@ -1043,7 +1064,7 @@ def main(force=False, notify_telegram=False):
                     }
             except Exception:
                 pass
-            sec_note = sync_secondary_account(today_str=today_str, template=sec_template, force=force)
+            sec_note = sync_secondary_account(today_str=today_str, template=sec_template, force=False)
             msg = "✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang." + sec_note
             if notify_telegram:
                 kirim_telegram(msg)

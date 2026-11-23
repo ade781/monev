@@ -90,21 +90,27 @@ def handle_telegram_command(chat_id, text):
 
     elif cmd in ["/monev", "/run", "/submit"]:
         diag = monev_bot.periksa_koneksi_dan_status()
+        sec_pending = False
         if diag.get("success") and diag.get("sudah_absen"):
-            dt = diag.get("data_absen") or {}
-            jam = f" (Tercatat jam {dt['created_at'].split('T')[1][:8]} WIB)" if "T" in dt.get("created_at", "") else ""
-            act_clean = monev_bot.safe_markdown(diag.get('activity_text', ''), max_len=280)
-            act = f"\n\n📝 *Kegiatan Terdata:*\n_{act_clean}_" if act_clean else ""
-            return (f"✅ *Presensi Monev Hari Ini Sudah Terisi!*{jam}\nAnda sudah tercatat hadir (PRESENT). Tidak perlu mengisi ulang.{act}", monev_bot.MENU_KEYBOARD)
+            sec_pending = monev_bot.is_secondary_pending(diag.get("today_str"))
+            if not sec_pending:
+                dt = diag.get("data_absen") or {}
+                jam = f" (Tercatat jam {dt['created_at'].split('T')[1][:8]} WIB)" if "T" in dt.get("created_at", "") else ""
+                act_clean = monev_bot.safe_markdown(diag.get('activity_text', ''), max_len=280)
+                act = f"\n\n📝 *Kegiatan Terdata:*\n_{act_clean}_" if act_clean else ""
+                sec_note = monev_bot.sync_secondary_account(today_str=diag.get("today_str"), readonly=True)
+                return (f"✅ *Presensi Monev Hari Ini Sudah Terisi!*{jam}\nAnda sudah tercatat hadir (PRESENT). Tidak perlu mengisi ulang.{act}{sec_note}", monev_bot.MENU_KEYBOARD)
 
         today_wib = datetime.now(monev_bot.WIB)
         today_str = today_wib.strftime("%Y-%m-%d")
         jam_str = today_wib.strftime("%H:%M:%S")
+        extra_note = "\n\nℹ️ _Akun utama sudah terisi; eksekusi ini hanya akan mengisi Akun 2._" if sec_pending else ""
         return (
             "⚠️ *KONFIRMASI EKSEKUSI MONEV*\n\n"
             "Halo Mas Ade, apakah Anda yakin ingin mengisi presensi dan laporan Monev hari ini ke server Kemnaker sekarang?\n\n"
             f"📅 *Tanggal:* `{today_str}`\n"
-            f"⏰ *Waktu:* `{jam_str} WIB`\n\n"
+            f"⏰ *Waktu:* `{jam_str} WIB`"
+            f"{extra_note}\n\n"
             "👇 _Silakan klik tombol di bawah untuk konfirmasi:_",
             monev_bot.CONFIRM_KEYBOARD
         )
@@ -127,7 +133,10 @@ def handle_telegram_command(chat_id, text):
 
         diag = monev_bot.periksa_koneksi_dan_status()
         if diag.get("success") and diag.get("sudah_absen"):
-            sec_note = monev_bot.sync_secondary_account(today_str=diag.get("today_str"), custom_activity=kegiatan)
+            if monev_bot.is_secondary_pending(diag.get("today_str")):
+                sec_note = monev_bot.sync_secondary_account(today_str=diag.get("today_str"), custom_activity=kegiatan)
+                return ("✅ *Akun utama sudah terisi sebelumnya.*" + sec_note, monev_bot.MENU_KEYBOARD)
+            sec_note = monev_bot.sync_secondary_account(today_str=diag.get("today_str"), readonly=True)
             return ("✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang." + sec_note, monev_bot.MENU_KEYBOARD)
 
         try:
@@ -176,19 +185,24 @@ def handle_telegram_command(chat_id, text):
             )
 
         diag = monev_bot.periksa_koneksi_dan_status()
+        sec_pending = False
         if diag.get("success") and diag.get("sudah_absen"):
-            return ("✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang.", monev_bot.MENU_KEYBOARD)
+            sec_pending = monev_bot.is_secondary_pending(diag.get("today_str"))
+            if not sec_pending:
+                sec_note = monev_bot.sync_secondary_account(today_str=diag.get("today_str"), readonly=True)
+                return ("✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang." + sec_note, monev_bot.MENU_KEYBOARD)
 
         _set_pending(chat_id, kegiatan)
         today_wib = datetime.now(monev_bot.WIB)
         today_str = today_wib.strftime("%Y-%m-%d")
         jam_str = today_wib.strftime("%H:%M:%S")
         keg_clean = monev_bot.safe_markdown(kegiatan, max_len=280)
+        extra_note = "\n\nℹ️ _Akun utama sudah terisi; eksekusi ini hanya akan mengisi Akun 2._" if sec_pending else ""
 
         return (
             "⚠️ *KONFIRMASI PENGISIAN KEGIATAN KUSTOM*\n\n"
             f"📅 *Tanggal:* `{today_str}` ({jam_str} WIB)\n"
-            f"📝 *Kegiatan:*\n_{keg_clean}_\n\n"
+            f"📝 *Kegiatan:*\n_{keg_clean}_{extra_note}\n\n"
             "Apakah Anda yakin ingin submit laporan ini ke Kemnaker sekarang?\n"
             "👇 _Klik tombol di bawah atau balas chat ini dengan ketik:_ `ya`",
             make_isi_confirm_keyboard(kegiatan)

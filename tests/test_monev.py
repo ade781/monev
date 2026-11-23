@@ -194,8 +194,13 @@ class TestMonevCore(unittest.TestCase):
         # Tanpa KEMNAKER_USERNAME_2, harus mengembalikan string kosong
         old_u2 = os.environ.pop("KEMNAKER_USERNAME_2", None)
         old_p2 = os.environ.pop("KEMNAKER_PASSWORD_2", None)
+        old_mod_u2 = monev_bot.KEMNAKER_USERNAME_2
+        old_mod_p2 = monev_bot.KEMNAKER_PASSWORD_2
+        monev_bot.KEMNAKER_USERNAME_2 = None
+        monev_bot.KEMNAKER_PASSWORD_2 = None
         try:
             self.assertEqual(monev_bot.sync_secondary_account(), "")
+            self.assertFalse(monev_bot.is_secondary_pending("2026-11-23"))
 
             # Dengan KEMNAKER_USERNAME_2 aktif (mocked)
             os.environ["KEMNAKER_USERNAME_2"] = "user2@example.com"
@@ -216,7 +221,24 @@ class TestMonevCore(unittest.TestCase):
                 note_err = monev_bot.sync_secondary_account(today_str="2026-11-23")
                 self.assertIn("Akun 2", note_err)
                 self.assertIn("Gagal", note_err)
+
+            # Uji is_secondary_pending & main(force=True) tidak double-submit Akun 1
+            with patch("monev_bot.login_kemnaker", return_value="tok"), \
+                 patch("monev_bot.periksa_absen_hari_ini", return_value=(False, None)):
+                self.assertTrue(monev_bot.is_secondary_pending("2026-11-23"))
+
+            with patch("monev_bot.login_kemnaker", return_value="tok1"), \
+                 patch("monev_bot.periksa_absen_hari_ini", return_value=(True, {"date": "2026-11-23"})), \
+                 patch("monev_bot.api_call", return_value={"data": [{"activity_log": "Kerja tim"}]}), \
+                 patch("monev_bot.submit_monev") as mock_primary_sub, \
+                 patch("monev_bot.sync_secondary_account", return_value="\n\n👥 *Akun 2 (Budi):* ✅ Berhasil ikut diisi") as mock_sync2:
+                res = monev_bot.main(force=True, notify_telegram=False)
+                self.assertEqual(res["status"], "already_submitted")
+                mock_primary_sub.assert_not_called()
+                mock_sync2.assert_called_once()
         finally:
+            monev_bot.KEMNAKER_USERNAME_2 = old_mod_u2
+            monev_bot.KEMNAKER_PASSWORD_2 = old_mod_p2
             if old_u2 is not None:
                 os.environ["KEMNAKER_USERNAME_2"] = old_u2
             else:
