@@ -183,5 +183,48 @@ class TestMonevCore(unittest.TestCase):
             # Pastikan sama sekali TIDAK ADA pengiriman pesan Telegram di akhir pekan
             mock_tg.assert_not_called()
 
+    def test_secondary_account_token_isolation_and_sync(self):
+        """Uji isolasi file cache token per username dan sync akun ke-2"""
+        from unittest.mock import patch
+
+        f1 = monev_bot._token_cache_file(monev_bot.KEMNAKER_USERNAME)
+        f2 = monev_bot._token_cache_file("user2@example.com")
+        self.assertNotEqual(f1, f2)
+
+        # Tanpa KEMNAKER_USERNAME_2, harus mengembalikan string kosong
+        old_u2 = os.environ.pop("KEMNAKER_USERNAME_2", None)
+        old_p2 = os.environ.pop("KEMNAKER_PASSWORD_2", None)
+        try:
+            self.assertEqual(monev_bot.sync_secondary_account(), "")
+
+            # Dengan KEMNAKER_USERNAME_2 aktif (mocked)
+            os.environ["KEMNAKER_USERNAME_2"] = "user2@example.com"
+            os.environ["KEMNAKER_PASSWORD_2"] = "secret2"
+            with patch("monev_bot.login_kemnaker", return_value="tok2"), \
+                 patch("monev_bot.api_call", return_value={"data": {"name": "Budi"}}), \
+                 patch("monev_bot.periksa_absen_hari_ini", return_value=(False, None)), \
+                 patch("monev_bot.submit_monev", return_value={"message": "ok"}) as mock_sub:
+                note = monev_bot.sync_secondary_account(today_str="2026-11-23", template={"activity": "A", "learning": "L", "obstacles": "O"})
+                self.assertIn("Akun 2 (Budi)", note)
+                self.assertIn("Berhasil ikut diisi", note)
+                mock_sub.assert_called_once()
+                _, kwargs = mock_sub.call_args
+                self.assertFalse(kwargs.get("mark_used"))
+
+            # Jika akun ke-2 error, tidak melempar exception
+            with patch("monev_bot.login_kemnaker", side_effect=Exception("Auth failed")):
+                note_err = monev_bot.sync_secondary_account(today_str="2026-11-23")
+                self.assertIn("Akun 2", note_err)
+                self.assertIn("Gagal", note_err)
+        finally:
+            if old_u2 is not None:
+                os.environ["KEMNAKER_USERNAME_2"] = old_u2
+            else:
+                os.environ.pop("KEMNAKER_USERNAME_2", None)
+            if old_p2 is not None:
+                os.environ["KEMNAKER_PASSWORD_2"] = old_p2
+            else:
+                os.environ.pop("KEMNAKER_PASSWORD_2", None)
+
 if __name__ == "__main__":
     unittest.main()

@@ -84,7 +84,7 @@ export default {
       });
 
       const responseHeaders = new Headers();
-      
+
       // Salin response headers
       for (const [key, value] of response.headers.entries()) {
         if (key.toLowerCase() === "set-cookie") {
@@ -129,7 +129,7 @@ export default {
    * - 0 2 * * 1-5  = 02:00 UTC (09:00 WIB) -> Monitoring Pagi & Cek Sistem
    * - 0 8 * * 1-5  = 08:00 UTC (15:00 WIB) -> Auto Monev (Jam 3 Sore)
    * - 0 11 * * 1-5 = 11:00 UTC (18:00 WIB) -> Cek Status Jam 6 Sore & Auto-Retry
-   * - 0 14 * * 1-5 = 14:00 UTC (21:00 WIB) -> Cek Status Jam 9 Malam + Cuplikan Monev & Auto-Retry
+   * - 0 14 * * 1-5 = 14:00 UTC (21:00 WIB) -> C1 ek Status Jam 9 Malam + Cuplikan Monev & Auto-Retry
    * Akhir pekan (Sabtu & Minggu): Tidak ada aktivitas / disabled total.
    */
   async scheduled(event, env, ctx) {

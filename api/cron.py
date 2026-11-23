@@ -127,17 +127,20 @@ def handle_telegram_command(chat_id, text):
 
         diag = monev_bot.periksa_koneksi_dan_status()
         if diag.get("success") and diag.get("sudah_absen"):
-            return ("✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang.", monev_bot.MENU_KEYBOARD)
+            sec_note = monev_bot.sync_secondary_account(today_str=diag.get("today_str"), custom_activity=kegiatan)
+            return ("✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang." + sec_note, monev_bot.MENU_KEYBOARD)
 
         try:
             res = monev_bot.submit_monev(custom_activity=kegiatan)
+            sec_note = monev_bot.sync_secondary_account(custom_activity=kegiatan)
             msg = res.get("message") or "Laporan berhasil diserahkan ke server Kemnaker!"
             keg_clean = monev_bot.safe_markdown(kegiatan, max_len=280)
             return (
                 "📝 *PENGISIAN KEGIATAN KUSTOM BERHASIL*\n\n"
                 "👤 *Peserta:* `Mas Ade`\n"
                 f"📌 *Kegiatan:* _{keg_clean}_\n\n"
-                f"📡 *Respon Server:* `{msg}`",
+                f"📡 *Respon Server:* `{msg}`"
+                f"{sec_note}",
                 monev_bot.MENU_KEYBOARD
             )
         except Exception as e:

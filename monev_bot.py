@@ -9,6 +9,7 @@ import re
 import json
 import time
 import random
+import hashlib
 import tempfile
 import urllib.request
 import urllib.parse
@@ -46,6 +47,8 @@ def _safe_float(val, default):
 
 KEMNAKER_USERNAME = os.getenv("KEMNAKER_USERNAME")
 KEMNAKER_PASSWORD = os.getenv("KEMNAKER_PASSWORD")
+KEMNAKER_USERNAME_2 = os.getenv("KEMNAKER_USERNAME_2")
+KEMNAKER_PASSWORD_2 = os.getenv("KEMNAKER_PASSWORD_2")
 OFFICE_LAT = _safe_float(os.getenv("OFFICE_LAT"), -7.8981812)
 OFFICE_LONG = _safe_float(os.getenv("OFFICE_LONG"), 110.0499084)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -80,6 +83,7 @@ CONFIRM_KEYBOARD = {
 # Cache in-memory untuk template & token SSO
 _CACHED_TOKEN = None
 _CACHED_TOKEN_TIME = 0
+_CACHED_TOKENS = {}
 _REMINDER_TEMPLATES = None
 _ACTIVITY_TEMPLATES = None
 _TRIGGER_HISTORY = {}
@@ -99,11 +103,14 @@ def safe_markdown(text, max_len=None):
     return clean
 
 # Utilitas Disk Cache Token SSO (Antar-Panggilan Serverless)
-def _token_cache_file():
-    return os.path.join(tempfile.gettempdir(), "kemnaker_token_cache.json")
+def _token_cache_file(username=None):
+    if not username or username == KEMNAKER_USERNAME:
+        return os.path.join(tempfile.gettempdir(), "kemnaker_token_cache.json")
+    user_hash = hashlib.sha256(str(username).encode("utf-8")).hexdigest()[:12]
+    return os.path.join(tempfile.gettempdir(), f"kemnaker_token_cache_{user_hash}.json")
 
-def _get_cached_token_from_disk():
-    path = _token_cache_file()
+def _get_cached_token_from_disk(username=None):
+    path = _token_cache_file(username)
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -116,16 +123,16 @@ def _get_cached_token_from_disk():
             pass
     return None, 0
 
-def _save_cached_token_to_disk(token):
-    path = _token_cache_file()
+def _save_cached_token_to_disk(token, username=None):
+    path = _token_cache_file(username)
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"token": token, "timestamp": time.time()}, f)
     except Exception:
         pass
 
-def _clear_cached_token_from_disk():
-    path = _token_cache_file()
+def _clear_cached_token_from_disk(username=None):
+    path = _token_cache_file(username)
     try:
         if os.path.exists(path):
             os.remove(path)
@@ -309,21 +316,32 @@ class SafeCookieJar(http.cookiejar.CookieJar):
             return
         super().set_cookie(cookie)
 
-def login_kemnaker(force_refresh=False):
+def login_kemnaker(force_refresh=False, username=None, password=None):
     global _CACHED_TOKEN, _CACHED_TOKEN_TIME
+    target_user = (username if username is not None else (os.getenv("KEMNAKER_USERNAME") or KEMNAKER_USERNAME)) or ""
+    target_pass = (password if password is not None else (os.getenv("KEMNAKER_PASSWORD") or KEMNAKER_PASSWORD)) or ""
+    is_primary = (username is None or target_user == (os.getenv("KEMNAKER_USERNAME") or KEMNAKER_USERNAME))
+    cache_key = target_user or "_default"
     now = time.time()
+
     if not force_refresh:
-        if _CACHED_TOKEN and (now - _CACHED_TOKEN_TIME) < TOKEN_CACHE_TTL:
+        mem_entry = _CACHED_TOKENS.get(cache_key)
+        if mem_entry and mem_entry[0] and (now - mem_entry[1]) < TOKEN_CACHE_TTL:
+            return mem_entry[0]
+        if is_primary and _CACHED_TOKEN and (now - _CACHED_TOKEN_TIME) < TOKEN_CACHE_TTL:
             return _CACHED_TOKEN
-        disk_token, disk_ts = _get_cached_token_from_disk()
+        disk_token, disk_ts = _get_cached_token_from_disk(target_user)
         if disk_token:
-            _CACHED_TOKEN = disk_token
-            _CACHED_TOKEN_TIME = disk_ts
+            _CACHED_TOKENS[cache_key] = (disk_token, disk_ts)
+            if is_primary:
+                _CACHED_TOKEN = disk_token
+                _CACHED_TOKEN_TIME = disk_ts
             return disk_token
 
-    manual = os.getenv("KEMNAKER_BEARER_TOKEN")
-    if manual and len(manual) > 20:
-        return manual.strip()
+    if is_primary:
+        manual = os.getenv("KEMNAKER_BEARER_TOKEN")
+        if manual and len(manual) > 20:
+            return manual.strip()
 
     cj = SafeCookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
@@ -340,7 +358,7 @@ def login_kemnaker(force_refresh=False):
     csrf = (re.search(r'name="csrf-token"\s+content="([^"]+)"', html_init) or ["", ""])[1]
 
     # Kirim login
-    payload_login = json.dumps({"username": KEMNAKER_USERNAME, "password": KEMNAKER_PASSWORD}).encode("utf-8")
+    payload_login = json.dumps({"username": target_user, "password": target_pass}).encode("utf-8")
     req_login = urllib.request.Request(wrap_url("https://account.kemnaker.go.id/auth/login"), data=payload_login, headers={
         **browser_headers,
         "Content-Type": "application/json",
@@ -360,9 +378,11 @@ def login_kemnaker(force_refresh=False):
     if not token:
         raise Exception("Gagal mengekstrak naco_access_token")
 
-    _CACHED_TOKEN = token
-    _CACHED_TOKEN_TIME = now
-    _save_cached_token_to_disk(token)
+    _CACHED_TOKENS[cache_key] = (token, now)
+    if is_primary:
+        _CACHED_TOKEN = token
+        _CACHED_TOKEN_TIME = now
+    _save_cached_token_to_disk(token, target_user)
     return token
 
 # 4. Pengecekan & Diagnosis Sistem
@@ -446,6 +466,8 @@ def format_status_presensi():
     user_name = safe_markdown(diag.get("user_name", "Mas Ade"))
     mentor_name = safe_markdown(diag.get("mentor_name", "-"))
 
+    sec_note = sync_secondary_account(today_str=diag["today_str"], readonly=True)
+
     if diag["sudah_absen"]:
         dt = diag.get("data_absen") or {}
         app_st = dt.get("approval_status", "SUBMITTED")
@@ -463,6 +485,7 @@ def format_status_presensi():
             f"{act}"
             f"{sisa_info}"
             "✨ _Presensi hari ini sudah aman tercatat. Tidak perlu diisi ulang!_"
+            f"{sec_note}"
         )
     return (
         "🔍 *STATUS PRESENSI HARI INI*\n\n"
@@ -473,6 +496,7 @@ def format_status_presensi():
         "📊 *Status Presensi:* ⚠️ *BELUM TERISI*\n\n"
         f"{sisa_info}"
         "💡 _Belum ada presensi untuk hari ini. Mas Ade bisa mengisi manual di web, ketik `/isi <kegiatan>`, atau jalankan `/monev`._"
+        f"{sec_note}"
     )
 
 # 5. Template & Eksekusi Monev
@@ -636,7 +660,7 @@ def ambil_template(today_wib, token=None):
     template, _, _ = ambil_template_belum_terpakai(today_wib=today_wib, token=token)
     return template
 
-def submit_monev(token=None, today_str=None, template=None, custom_activity=None):
+def submit_monev(token=None, today_str=None, template=None, custom_activity=None, mark_used=True):
     """Fungsi tunggal untuk submit presensi (otomatis maupun kustom)"""
     today_wib = datetime.now(WIB)
     today_str = today_str or today_wib.strftime("%Y-%m-%d")
@@ -666,10 +690,52 @@ def submit_monev(token=None, today_str=None, template=None, custom_activity=None
     res = api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/attendances/with-daily-log", token, method="POST", payload=payload)
 
     # Tandai template sebagai terpakai jika sukses dan bukan custom activity
-    if not custom_activity and template and template.get("id"):
+    if mark_used and not custom_activity and template and template.get("id"):
         tandai_template_terpakai(template, today_str)
 
     return res
+
+
+def sync_secondary_account(today_str=None, template=None, custom_activity=None, force=False, readonly=False):
+    """Menjalankan cek/submit minimal untuk akun ke-2 (KEMNAKER_USERNAME_2) dan mengembalikan 1 baris ringkas."""
+    u2 = (os.getenv("KEMNAKER_USERNAME_2") or KEMNAKER_USERNAME_2 or "").strip()
+    p2 = (os.getenv("KEMNAKER_PASSWORD_2") or KEMNAKER_PASSWORD_2 or "").strip()
+    if not u2 or not p2:
+        return ""
+
+    today_wib = datetime.now(WIB)
+    today_str = today_str or today_wib.strftime("%Y-%m-%d")
+
+    try:
+        token2 = login_kemnaker(username=u2, password=p2)
+        name2 = u2
+        try:
+            me2 = api_call("https://monev-api.maganghub.kemnaker.go.id/api/v1/users/me", token2).get("data", {})
+            if me2.get("name"):
+                name2 = me2["name"]
+        except Exception:
+            pass
+        name2_clean = safe_markdown(name2, max_len=30)
+
+        sudah2, _ = periksa_absen_hari_ini(token2, today_str)
+        if readonly:
+            status_txt = "✅ Sudah Terisi" if sudah2 else "⚠️ Belum Terisi"
+            return f"\n\n👥 *Akun 2 ({name2_clean}):* {status_txt}"
+
+        if sudah2 and not force:
+            return f"\n\n👥 *Akun 2 ({name2_clean}):* ✅ Sudah terisi sebelumnya"
+
+        submit_monev(
+            token=token2,
+            today_str=today_str,
+            template=template,
+            custom_activity=custom_activity,
+            mark_used=False
+        )
+        return f"\n\n👥 *Akun 2 ({name2_clean}):* ✅ Berhasil ikut diisi"
+    except Exception as e:
+        err_clean = safe_markdown(str(e), max_len=100)
+        return f"\n\n👥 *Akun 2:* ❌ Gagal (`{err_clean}`)"
 
 # Alias backward-compatibility
 test_post_kemnaker = submit_monev
@@ -810,6 +876,8 @@ def kirim_status_harian(waktu_label=None, chat_id=None, force=False):
         app_st = dt.get("approval_status", "SUBMITTED")
         jam_absen = f"jam {dt['created_at'].split('T')[1][:8]} WIB" if "T" in dt.get("created_at", "") else "Tercatat"
         act_raw = diag.get("activity_text", "")
+        sec_template = {"activity": act_raw, "learning": "Mempelajari dan menyelesaikan tugas operasional harian sesuai arahan di unit kerja.", "obstacles": "Semua kegiatan berjalan dengan lancar dan tidak ada kendala yang berarti."} if act_raw else None
+        sec_note = sync_secondary_account(today_str=today_str, template=sec_template, readonly=is_pagi)
 
         if is_malam:
             # Jam 21:00 malam: Tampilkan status + cuplikan kegiatan (8-12 kata)
@@ -830,6 +898,7 @@ def kirim_status_harian(waktu_label=None, chat_id=None, force=False):
                 f"{preview_sec}"
                 f"📦 *Stok Template Cadangan:* `{sisa} dari {total} template`\n\n"
                 "✨ _Laporan monev dan kehadiran hari ini telah selesai dan aman! Selamat beristirahat._"
+                f"{sec_note}"
             )
         else:
             act_clean = safe_markdown(act_raw, max_len=280)
@@ -849,6 +918,7 @@ def kirim_status_harian(waktu_label=None, chat_id=None, force=False):
                 f"{act_sec}"
                 f"📦 *Stok Template Cadangan:* `{sisa} dari {total} template`\n\n"
                 "✨ _Presensi hari ini sudah aman dan tercatat di Kemnaker._"
+                f"{sec_note}"
             )
 
         kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
@@ -856,6 +926,7 @@ def kirim_status_harian(waktu_label=None, chat_id=None, force=False):
 
     # 2. KONDISI BELUM ABSEN (Hari Kerja)
     if is_pagi:
+        sec_note = sync_secondary_account(today_str=today_str, readonly=True)
         pesan = (
             f"{salam_text}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -869,6 +940,7 @@ def kirim_status_harian(waktu_label=None, chat_id=None, force=False):
             "⚡ _Auto-Monev dijadwalkan otomatis berjalan pada pukul 15:00 WIB (Jam 3 Sore)._\n\n"
             f"📦 *Stok Template Cadangan:* `{sisa} dari {total} template`\n\n"
             "👉 _Jika ingin mengisi sekarang lebih awal, klik tombol di bawah atau ketik `/isi <kegiatan>`._"
+            f"{sec_note}"
         )
         kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
         return {"status": "success", "sudah_absen": False, "message": "Status pagi terkirim (menunggu jadwal 15:00)"}
@@ -881,6 +953,7 @@ def kirim_status_harian(waktu_label=None, chat_id=None, force=False):
         act_text = diag_after.get("activity_text") or (retry_res.get("template") or {}).get("activity", "")
         snippet = extract_activity_snippet(act_text, max_words=12)
         snippet_clean = safe_markdown(snippet)
+        sec_note = retry_res.get("secondary_note", "")
 
         sisa_now, total_now = hitung_sisa_template(token=_CACHED_TOKEN)
         pesan = (
@@ -895,6 +968,7 @@ def kirim_status_harian(waktu_label=None, chat_id=None, force=False):
             f"📝 *Cuplikan Kegiatan:* _{snippet_clean}_\n"
             f"📦 *Sisa Stok Template:* `{sisa_now} dari {total_now} template`\n\n"
             "✨ _Laporan presensi dan logbook hari ini telah berhasil diselamatkan ke Kemnaker!_"
+            f"{sec_note}"
         )
         kirim_telegram(pesan, chat_id=chat_id, reply_markup=MENU_KEYBOARD)
         return {"status": "retry_success", "sudah_absen": True, "message": f"Auto-retry jam {w_norm} berhasil"}
@@ -958,14 +1032,27 @@ def main(force=False, notify_telegram=False):
         token = login_kemnaker()
         sudah, data_absen = periksa_absen_hari_ini(token, today_str)
         if sudah and not force:
-            msg = "✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang."
+            sec_template = None
+            try:
+                logs = api_call(f"https://monev-api.maganghub.kemnaker.go.id/api/v1/daily-logs?date={today_str}", token).get("data", [])
+                if logs and logs[0].get("activity_log"):
+                    sec_template = {
+                        "activity": logs[0]["activity_log"],
+                        "learning": "Mempelajari dan menyelesaikan tugas operasional harian sesuai arahan di unit kerja.",
+                        "obstacles": "Semua kegiatan berjalan dengan lancar dan tidak ada kendala yang berarti."
+                    }
+            except Exception:
+                pass
+            sec_note = sync_secondary_account(today_str=today_str, template=sec_template, force=force)
+            msg = "✅ *Presensi Monev Hari Ini Sudah Terisi!*\nAnda sudah tercatat hadir (PRESENT) di Kemnaker. Tidak perlu mengisi ulang." + sec_note
             if notify_telegram:
                 kirim_telegram(msg)
-            return {"status": "already_submitted", "date": today_str, "message": msg}
+            return {"status": "already_submitted", "date": today_str, "message": msg, "secondary_note": sec_note}
 
         # Ambil template yang belum pernah dipakai sama sekali
         template, sisa_sebelum, total = ambil_template_belum_terpakai(today_wib, token=token)
         hasil = submit_monev(token=token, today_str=today_str, template=template)
+        sec_note = sync_secondary_account(today_str=today_str, template=template, force=force)
 
         # Hitung sisa template setelah berhasil terpakai
         sisa_sekarang = max(0, sisa_sebelum - 1) if sisa_sebelum > 0 else 0
@@ -988,10 +1075,11 @@ def main(force=False, notify_telegram=False):
             f"📦 Sisa template belum terpakai: *{sisa_sekarang} dari {total} template*"
             f"{warning_sisa}\n\n"
             "✨ _Laporan presensi dan logbook harian berhasil diserahkan ke Kemnaker!_"
+            f"{sec_note}"
         )
         if notify_telegram:
             kirim_telegram(msg)
-        return {"status": "success", "date": today_str, "message": msg, "template": template, "sisa_template": sisa_sekarang, "total_template": total}
+        return {"status": "success", "date": today_str, "message": msg, "template": template, "sisa_template": sisa_sekarang, "total_template": total, "secondary_note": sec_note}
     except Exception as e:
         err_clean = safe_markdown(str(e), max_len=200)
         msg = (
