@@ -120,15 +120,15 @@ class TestMonevCore(unittest.TestCase):
         self.assertIn("session_token", cookie_names)
 
     def test_template_stock_and_themes(self):
-        """Uji stok 50 template dan fokus pengembangan aplikasi"""
+        """Uji stok 80 template, pasangan templates_2.json, dan fokus pengembangan aplikasi"""
         templates = monev_bot.muat_semua_template()
-        self.assertEqual(len(templates), 50)
+        self.assertEqual(len(templates), 80)
         
         # Seluruh template harus memiliki ID unik dan non-empty fields
         ids = [t["id"] for t in templates]
         self.assertEqual(len(ids), len(set(ids)))
         self.assertEqual(min(ids), 18)
-        self.assertEqual(max(ids), 67)
+        self.assertEqual(max(ids), 97)
         
         for t in templates:
             self.assertTrue(len(t["activity"]) > 80)
@@ -149,13 +149,39 @@ class TestMonevCore(unittest.TestCase):
                 "notification_sound_alerts", "csv_data_importer", "gps_offline_caching",
                 "accessibility_wcag", "signature_pad_enhancement", "data_sync_conflict_resolution",
                 "bundle_optimization_treeshaking", "dark_mode_theming", "input_sanitization_xss",
-                "service_worker_lifecycle"
+                "service_worker_lifecycle",
+                "acms_personnel_stkp", "acms_structural_roles", "acms_profile_access",
+                "acms_fleet_readiness", "acms_watchroom_facility", "acms_shift_roster",
+                "acms_leave_quota", "acms_auto_eviction", "acms_daily_logbook",
+                "acms_incident_reporting", "acms_pdf_report_engine", "acms_digital_signature_pdf",
+                "acms_dry_unification", "acms_safe_lazy_error", "acms_form_performance",
+                "acms_ui_cleanup", "acms_feedback_toast", "acms_mobile_layout",
+                "acms_sandbox_qa", "acms_qa_documentation", "acms_build_verification",
+                "skyapar_inventory", "skyapar_inspection_sync",
+                "skycare_architecture", "skycare_design_system", "skycare_export_security",
+                "botskytrax_survey_cli", "botskytrax_validation_vote",
+                "pelaporan_dashdua_ui", "monev_automation_sync"
             ])
 
-        # Sisa template belum terpakai harus tepat 50
+        # Sisa template belum terpakai harus tepat 80
         _, sisa, total = monev_bot.ambil_template_belum_terpakai()
-        self.assertEqual(sisa, 50)
-        self.assertEqual(total, 50)
+        self.assertEqual(sisa, 80)
+        self.assertEqual(total, 80)
+
+        # Uji 30 template pasangan di templates_2.json (ID 68-97) berbeda redaksi dari Akun 1
+        templates_2 = monev_bot.muat_semua_template_2()
+        self.assertEqual(len(templates_2), 30)
+        map_1 = {t["id"]: t for t in templates}
+        for t2 in templates_2:
+            self.assertIn(t2["id"], map_1)
+            self.assertNotEqual(t2["activity"], map_1[t2["id"]]["activity"])
+            self.assertTrue(len(t2["activity"]) > 80)
+            self.assertTrue(len(t2["learning"]) > 40)
+            self.assertTrue(len(t2["obstacles"]) > 40)
+
+        # Uji resolusi pasangan & fallback
+        self.assertEqual(monev_bot.ambil_template_pasangan(map_1[68])["activity"], templates_2[0]["activity"])
+        self.assertEqual(monev_bot.ambil_template_pasangan(map_1[18])["activity"], map_1[18]["activity"])
 
     def test_weekend_auto_monev_skip(self):
         """Uji auto-monev, status, dan pengingat melewati eksekusi di hari Sabtu dan Minggu tanpa mengirim apapun ke Telegram"""

@@ -1,0 +1,212 @@
+[
+  {
+    "id": 68,
+    "category": "acms_personnel_stkp",
+    "activity": "Merancang antarmuka manajemen master personel dan formulir kredensial lisensi STKP (Basic, Junior, Senior) pada frontend React aplikasi ACMS YIA. Menata tampilan katalog personel agar berfokus khusus pada empat regu dinas operasional (Alpha, Bravo, Charlie, Delta) lengkap dengan indikator tanggal kedaluwarsa lisensi.",
+    "learning": "Memahami penyusunan komponen katalog data operasional di React serta validasi input tanggal dan kategori lisensi kepegawaian pada sisi klien.",
+    "obstacles": "Tampilan tabel personel sempat terlihat penuh ketika menampilkan informasi personel non-shift bersamaan dengan regu operasional. Solusinya, tampilan katalog difokuskan murni pada empat regu dinas sesuai kebutuhan operasional lapangan."
+  },
+  {
+    "id": 69,
+    "category": "acms_structural_roles",
+    "activity": "Mengembangkan halaman pengaturan pejabat struktural dinamis pada frontend ACMS YIA meliputi formulir input mandiri data Department Head (Nama Lengkap, NIP, Jabatan, dan unggah tanda tangan) serta penentuan Ketua Regu untuk empat regu dinas. Memastikan seluruh tampilan jabatan di aplikasi menarik data terbaru dari API tanpa teks statis.",
+    "learning": "Mengasah kemampuan pembuatan formulir pengaturan struktural yang dinamis dan integrasi pratinjau unggahan tanda tangan digital pada antarmuka React.",
+    "obstacles": "Input pejabat Department Head sebelumnya sempat diarahkan untuk memilih dari daftar anggota regu operasional sehingga tidak sesuai struktur organisasi. Komponennya diubah menjadi formulir input mandiri yang terpisah dari daftar regu."
+  },
+  {
+    "id": 70,
+    "category": "acms_profile_access",
+    "activity": "Menyeragamkan komponen sub-view Profil Pribadi dan Kartu Dokumen & Sertifikat Saya pada aplikasi ACMS YIA untuk seluruh peran pengguna (Admin, Chief, Kru) melalui avatar di Header Top App Bar. Menyusun dua kartu baku yaitu Profil & Kredensial STKP serta arsip dokumen PDF lengkap dengan tombol unggah dan tautan unduh.",
+    "learning": "Mendalami perancangan tata letak sub-view profil yang konsisten lintas role serta penanganan tautan unduhan lampiran terautentikasi di browser.",
+    "obstacles": "Akses halaman profil sebelumnya tersebar di menu navigasi bawah sehingga sulit ditemukan secara seragam. Penempatannya disatukan ke avatar header atas dengan tampilan layar penuh agar lebih nyaman digunakan."
+  },
+  {
+    "id": 71,
+    "category": "acms_fleet_readiness",
+    "activity": "Membangun antarmuka pengecekan Kelaikan Armada Modul 2 pada aplikasi ACMS YIA dengan pilihan status baku Serviceable dan Unserviceable serta penanda visual Belum Dilaporkan bagi unit yang belum diperiksa pada shift berjalan. Menambahkan kolom wajib catatan rincian kendala dan catatan tindak lanjut pemulihan saat status armada bermasalah.",
+    "learning": "Memahami perancangan formulir inspeksi kesiapan kendaraan yang intuitif serta validasi kondisional kolom kendala di React.",
+    "obstacles": "Petugas sempat kebingungan membedakan armada yang benar-benar siap pakai dengan armada yang belum diperiksa di awal shift. Masalah diatasi dengan menampilkan badge status default 'Belum Dilaporkan' yang kontras sebelum pemeriksaan disimpan."
+  },
+  {
+    "id": 72,
+    "category": "acms_watchroom_facility",
+    "activity": "Mengembangkan komponen checklist fasilitas Watchroom (radio komunikasi ground-to-air, sirine crash bell, dan komputer pemantau) serta fitur kompresi foto dokumentasi ke format WebP di sisi browser pada frontend ACMS YIA. Memastikan foto bukti kerusakan armada otomatis diperkecil sebelum dikirim ke backend.",
+    "learning": "Mempelajari penggunaan HTML5 Canvas client-side untuk konversi dan kompresi gambar ke WebP guna menghemat kuota dan mempercepat proses unggah di lapangan.",
+    "obstacles": "Foto beresolusi tinggi dari kamera ponsel sempat memperlambat proses unggah pada koneksi seluler di area bandara. Penambahan utilitas kompresi WebP sebelum pengiriman berhasil memangkas ukuran berkas secara signifikan."
+  },
+  {
+    "id": 73,
+    "category": "acms_shift_roster",
+    "activity": "Merancang tampilan kalender jadwal shift 4 regu (siklus 8 hari Pagi, Siang, Malam, Off) beserta fitur proteksi akses halaman Ploting Dinas di frontend ACMS YIA. Menambahkan penanda visual dan penguncian tombol simpan apabila pengguna yang membuka halaman bukan berasal dari regu yang sedang bertugas aktif pada shift berjalan.",
+    "learning": "Memahami sinkronisasi tampilan jadwal rotasi regu dengan logika hak akses berbasis shift aktif pada antarmuka React.",
+    "obstacles": "Pengguna dari regu yang sedang lepas piket sebelumnya masih bisa menekan tombol ubah ploting sebelum ditolak server. Hal ini diperbaiki dengan menambahkan proteksi UI dan keterangan 'Bukan Shift Anda' secara langsung."
+  },
+  {
+    "id": 74,
+    "category": "acms_leave_quota",
+    "activity": "Menguji dan menyempurnakan alur interaktivitas modal pengajuan dan pembatalan cuti pada frontend ACMS YIA agar seluruh tombol dapat diklik responsif. Menampilkan riwayat cuti dalam format Paket Pengajuan Terpadu (rentang tanggal dan durasi hari) serta memisahkan tampilan kelola cuti Admin dari tombol pengajuan mandiri personel.",
+    "learning": "Menguasai perancangan komponen modal pengajuan cuti yang bebas macet serta penyajian tabel riwayat rentang tanggal yang ringkas tanpa baris ganda.",
+    "obstacles": "Modal pengajuan cuti pada salah satu tampilan kru sempat gagal memuat daftar alasan cuti secara dinamis. Kendala diperbaiki dengan memverifikasi sumber state dropdown dan memastikan event klik tombol terhubung benar."
+  },
+  {
+    "id": 75,
+    "category": "acms_auto_eviction",
+    "activity": "Melakukan pengujian fungsionalitas integritas penugasan armada terhadap pengajuan cuti dan mutasi regu pada aplikasi ACMS YIA. Memastikan saat personel mengajukan cuti, slot kendaraannya langsung terlepas di tampilan Ploting Dinas, serta memverifikasi munculnya pesan peringatan informatif saat Admin mencoba memindahkan regu personel yang sedang bertugas aktif.",
+    "learning": "Memahami pengujian skenario edge-case keterkaitan antar-modul (Cuti, Ploting Dinas, dan Master Personel) untuk mencegah konflik penugasan ganda.",
+    "obstacles": "Tampilan daftar kru pada halaman ploting sempat masih menampilkan nama personel yang baru saja disetujui cutinya sebelum halaman dimuat ulang. Masalah diatasi dengan memicu pembaruan state data ploting seketika setelah mutasi cuti berhasil."
+  },
+  {
+    "id": 76,
+    "category": "acms_daily_logbook",
+    "activity": "Membangun antarmuka pencatatan Logbook Kegiatan Harian Modul 4 pada aplikasi ACMS YIA yang mendukung pemilihan 8 kategori baku kegiatan operasional ARFF serta unggah foto dokumentasi. Menyediakan dialog konfirmasi penghapusan entri logbook agar petugas dapat mengelola catatan kegiatan shift dengan rapi.",
+    "learning": "Mendalami perancangan formulir logbook dinas terstruktur serta pengelolaan modal konfirmasi aksi destruktif pada antarmuka React.",
+    "obstacles": "Daftar kategori kegiatan yang ditampilkan pada formulir modal sempat belum seragam penamaannya dengan label di rekapitulasi PDF. Penamaan label diselaraskan menggunakan satu konstanta referensi kategori yang sama."
+  },
+  {
+    "id": 77,
+    "category": "acms_incident_reporting",
+    "activity": "Mengembangkan formulir dan daftar pelaporan insiden darurat airside pada frontend ACMS YIA dengan 10 pilihan klasifikasi baku kejadian ARFF serta rincian kronologi penanganan. Memastikan seluruh tombol aksi dan modal detail insiden tampil proporsional di layar desktop maupun perangkat mobile.",
+    "learning": "Memahami penyusunan antarmuka pelaporan kejadian darurat yang cepat diisi serta tampilan ringkasan status insiden pada rekapitulasi shift.",
+    "obstacles": "Teks kronologi insiden yang panjang sempat membuat tinggi kartu daftar insiden tidak seragam. Solusinya, diterapkan pemotongan pratinjau teks rapi dengan opsi buka detail modal saat kartu diklik."
+  },
+  {
+    "id": 78,
+    "category": "acms_pdf_report_engine",
+    "activity": "Mengimplementasikan fitur pratinjau dan unduh Laporan Eksekutif Shift PDF A4 (`ActivityPdfPreviewModal`) pada frontend ACMS YIA serta memverifikasi kelengkapan tata letak dokumen cetak. Memeriksa kesesuaian kop surat PT Angkasa Pura Indonesia Cabang YIA, format nomor dokumen DSR, tabel armada, dan tabel daftar personel izin/cuti.",
+    "learning": "Menguasai pengujian visual tata letak dokumen cetak A4 dari sisi klien dan integrasi modal pratinjau PDF di aplikasi web React.",
+    "obstacles": "Pratinjau PDF di dalam iframe sempat gagal terbuka di beberapa browser karena kebijakan autentikasi berkas. Kendala diatasi dengan menyertakan parameter token yang valid pada URL endpoint pratinjau."
+  },
+  {
+    "id": 79,
+    "category": "acms_digital_signature_pdf",
+    "activity": "Melakukan pengujian verifikasi penandatangan dinamis pada hasil ekspor PDF Laporan Shift ACMS ARFF YIA untuk memastikan tanda tangan digital Department Head dan Ketua Regu tampil nyata menggantikan titik-titik kosong. Menguji pergantian antar-shift (Alpha, Bravo, Charlie, Delta) untuk memastikan nama Ketua Regu pada PDF selalu sesuai database shift.",
+    "learning": "Memahami teknik verifikasi integrasi aset digital dari unggahan pengguna hingga hasil akhir dokumen PDF yang siap cetak.",
+    "obstacles": "Pada uji coba awal dengan akun Admin yang login, nama Ketua Regu di laporan sempat mengikuti nama pengguna yang login. Pengujian ulang setelah perbaikan memastikan nama penandatangan murni mengikuti regu shift di database."
+  },
+  {
+    "id": 80,
+    "category": "acms_dry_unification",
+    "activity": "Menguji keseragaman output data laporan antara tampilan mobile dan desktop pada aplikasi ACMS ARFF YIA setelah penyatuan logika bisnis laporan (DRY). Memastikan fitur tombol Sahkan Shift yang dihapus sudah benar-benar bersih baik dari tampilan desktop, admin, maupun navigasi mobile.",
+    "learning": "Memahami pentingnya pengujian konsistensi lintas tampilan (desktop dan mobile) setelah proses refaktorisasi dan pembersihan fitur lama.",
+    "obstacles": "Ditemukan satu sisa tombol arsip lama pada salah satu modal mobile yang memicu error saat diklik karena endpoint-nya sudah dihapus. Sisa komponen tombol tersebut langsung dibersihkan."
+  },
+  {
+    "id": 81,
+    "category": "acms_safe_lazy_error",
+    "activity": "Menguji ketahanan pemuatan halaman dan rendering pesan kesalahan pada seluruh rute frontend ACMS ARFF YIA menggunakan `safeLazy`, `ErrorBoundary`, dan `renderError`. Mensimulasikan respons error API berbentuk objek bersarang guna memastikan antarmuka tetap menampilkan teks peringatan yang aman tanpa layar putih.",
+    "learning": "Mendalami teknik pengujian ketahanan UI React terhadap kegagalan pemuatan chunk dinamis dan format respons error API yang tidak terduga.",
+    "obstacles": "Salah satu komponen form modal sempat melempar error runtime karena langsung merender objek error Axios ke dalam JSX. Komponen tersebut diperbaiki agar selalu memanggil utilitas getErrorMessage."
+  },
+  {
+    "id": 82,
+    "category": "acms_form_performance",
+    "activity": "Melakukan audit responsivitas pengetikan pada seluruh elemen `<input>` dan `<textarea>` di aplikasi ACMS ARFF YIA untuk memastikan tidak ada lag saat pengguna mengetik cepat. Memverifikasi penghapusan kelas `transition-all` dan `backdrop-blur` pada modal aktif serta memastikan halaman login tampil cepat tanpa aset latar berat.",
+    "learning": "Memahami cara mengevaluasi performa interaksi formulir (INP) dan kecepatan render awal (LCP) pada antarmuka web berbasis Tailwind CSS.",
+    "obstacles": "Beberapa komponen input di form modal lama masih memakai kelas `transition-all` yang memicu kalkulasi ulang gaya per karakter. Seluruhnya diseragamkan menjadi `transition-colors duration-100`."
+  },
+  {
+    "id": 83,
+    "category": "acms_ui_cleanup",
+    "activity": "Memeriksa konsistensi teks dan tata letak antarmuka ACMS ARFF YIA guna menghilangkan tombol aksi ganda dalam satu halaman serta memastikan halaman dashboard utama tetap berstatus Coming Soon sesuai ketentuan. Memastikan seluruh halaman bebas dari jargon filler yang tidak relevan dengan data operasional riil.",
+    "learning": "Mengasah ketelitian audit UI/UX untuk menjaga antarmuka aplikasi tetap fokus, tidak berlebihan, dan bebas dari pengulangan kontrol aksi.",
+    "obstacles": "Pada halaman ploting sempat terdapat dua tombol simpan yang sama di banner informasi dan di atas tabel. Tombol ganda di banner dihapus agar pengguna hanya fokus pada satu titik aksi utama."
+  },
+  {
+    "id": 84,
+    "category": "acms_feedback_toast",
+    "activity": "Menguji seluruh alur umpan balik toast notifikasi (berhasil hijau dan gagal merah) pada aksi interaktif di aplikasi ACMS ARFF YIA seperti pengajuan cuti, pembaruan kesiapan armada, penyimpanan ploting, serta ubah profil. Memastikan setiap kegagalan validasi dari server menampilkan alasan penolakan yang jelas kepada pengguna.",
+    "learning": "Memahami pengujian pengalaman pengguna (UX) terkait kejelasan status sukses maupun gagal pada setiap aksi transaksi data.",
+    "obstacles": "Saat aksi batalkan cuti gagal karena koneksi terputus, sebelumnya tidak ada notifikasi apapun yang muncul di layar. Penanganan catch error ditambahkan agar toast merah langsung tampil menginformasikan kegagalan."
+  },
+  {
+    "id": 85,
+    "category": "acms_mobile_layout",
+    "activity": "Melakukan pengujian tampilan responsif seluruh halaman mobile ACMS ARFF YIA pada berbagai ukuran layar smartphone (360px hingga 430px) untuk peran Kru dan Chief. Memastikan menu Bottom Navigation Bar tidak menutupi tombol aksi di bagian bawah konten serta memastikan menu Profil tidak muncul di bar bawah.",
+    "learning": "Menguasai pengujian tata letak responsif perangkat genggam serta penyesuaian padding bawah agar konten gulir tidak tertutup bilah navigasi.",
+    "obstacles": "Pada layar ponsel berukuran kecil, tombol simpan di bagian paling bawah form sempat tertutup oleh fixed Bottom Navigation Bar. Masalah diatasi dengan menambahkan jarak padding bawah yang proporsional pada kontainer utama."
+  },
+  {
+    "id": 86,
+    "category": "acms_sandbox_qa",
+    "activity": "Melakukan uji coba skenario operasional harian ACMS ARFF YIA bersama data simulasi di folder `masak/` meliputi pengecekan login multi-role (Admin, Chief, Kru), pengisian kesiapan armada, pencatatan logbook, hingga pembuatan laporan shift. Memastikan tidak ada berkas pengujian atau folder test yang tercecer di direktori produksi.",
+    "learning": "Memahami pelaksanaan pengujian skenario pengguna lintas peran dan kedisiplinan menjaga kebersihan struktur direktori proyek.",
+    "obstacles": "Salah satu skrip uji coba lama sempat tersimpan di luar folder sandbox sehingga berisiko ikut terkomit. Berkas tersebut dipindahkan ke dalam folder masak yang sudah masuk daftar gitignore."
+  },
+  {
+    "id": 87,
+    "category": "acms_qa_documentation",
+    "activity": "Meninjau kelengkapan catatan audit kualitas pada berkas `QA.md` dan `RQA.md` di proyek ACMS ARFF YIA guna memastikan seluruh item perbaikan yang sudah lulus verifikasi telah dipindahkan ke arsip riwayat. Memeriksa format penulisan nama berkas di dokumentasi agar ringkas dan bebas dari path lokal yang panjang.",
+    "learning": "Memahami standar kerapian dokumentasi QA dan changelog agar mudah dibaca oleh rekan tim maupun pembimbing lapangan.",
+    "obstacles": "Beberapa entri di dokumentasi masih menuliskan tautan path lokal komputer secara penuh. Penulisan dirapikan menjadi nama berkas ringkas dengan format kode markdown."
+  },
+  {
+    "id": 88,
+    "category": "acms_build_verification",
+    "activity": "Melaksanakan uji regresi manual pada aplikasi ACMS ARFF YIA setelah proses build produksi frontend selesai dijalankan. Memeriksa konsol peramban di seluruh menu utama untuk memastikan tidak ada runtime error, peringatan key React yang hilang, maupun kegagalan pemuatan aset gambar dan logo.",
+    "learning": "Mendalami teknik inspeksi konsol peramban dan pengujian regresi fungsional menyeluruh setelah kompilasi bundel produksi.",
+    "obstacles": "Ditemukan peringatan konsol terkait atribut key yang kurang unik pada salah satu daftar kartu riwayat. Atribut key diperbaiki menggunakan kombinasi ID dan indeks unik entitas."
+  },
+  {
+    "id": 89,
+    "category": "skyapar_inventory",
+    "activity": "Menata tampilan daftar inventaris tabung APAR beserta detail lokasi penempatan per regu pada antarmuka proyek SkyAPAR YIA. Memastikan fitur pencarian dan penyaringan tabung berdasarkan zona lokasi berjalan responsif saat digunakan petugas di lapangan.",
+    "learning": "Memahami penyusunan komponen filter dan pencarian daftar aset keselamatan agar cepat diakses melalui perangkat desktop maupun ponsel.",
+    "obstacles": "Pencarian kode tabung yang mengandung huruf kapital dan tanda hubung sempat tidak cocok saat pengguna mengetik huruf kecil. Pencarian disempurnakan dengan normalisasi case-insensitive."
+  },
+  {
+    "id": 90,
+    "category": "skyapar_inspection_sync",
+    "activity": "Melakukan pengujian alur pemindaian dan formulir pemeriksaan kondisi fisik tabung APAR pada proyek SkyAPAR YIA. Memverifikasi bahwa setiap pembaruan status tabung rusak atau mendekati masa kedaluwarsa langsung tercermin pada indikator ringkasan di dashboard.",
+    "learning": "Mengasah kemampuan verifikasi kesesuaian data antara formulir input lapangan dengan tampilan metrik rekapitulasi dashboard.",
+    "obstacles": "Status tabung yang baru saja diperbarui sempat belum berubah di tampilan daftar hingga pengguna melakukan refresh manual. Masalah diperbaiki dengan memicu pembaruan state daftar segera setelah submit berhasil."
+  },
+  {
+    "id": 91,
+    "category": "skycare_architecture",
+    "activity": "Menguji alur pengiriman tiket pengaduan pelanggan dari formulir publik hingga tampil di dashboard pengelola pada proyek SkyCare YIA. Memastikan seluruh validasi input form menggunakan Zod/Yup berjalan selaras dengan struktur respons error dari backend.",
+    "learning": "Memahami penyelarasan validasi skema formulir di sisi klien dengan kontrak API backend berarsitektur Controller-Service-Repository.",
+    "obstacles": "Pesan kesalahan validasi dari backend sempat tampil dalam format array teknis yang sulit dibaca pengguna. Pesan tersebut diformat ulang di komponen form agar tampil sebagai teks instruksi yang jelas."
+  },
+  {
+    "id": 92,
+    "category": "skycare_design_system",
+    "activity": "Melakukan audit visual antarmuka formulir dan dashboard SkyCare YIA terhadap kontrak sistem desain YIA untuk memastikan konsistensi warna badge status (Open, In Progress, Resolved) dan tata letak responsif mobile-first. Memastikan kontras teks pada latar belakang putih dan abu-abu terang tetap nyaman dibaca.",
+    "learning": "Mendalami penerapan audit kesesuaian desain UI/UX dan keterbacaan kontras warna pada dashboard layanan pengaduan pelanggan.",
+    "obstacles": "Badge status 'In Progress' dengan warna yia-warning sempat memiliki kontras teks putih yang kurang terbaca di layar cerah. Warna teks pada badge disesuaikan menjadi teks gelap agar kontras tetap tinggi."
+  },
+  {
+    "id": 93,
+    "category": "skycare_export_security",
+    "activity": "Menguji alur login admin berbasis JWT, perubahan status penanganan pengaduan, serta hasil unduhan laporan CSV pada dashboard SkyCare YIA. Memverifikasi bahwa berkas CSV hasil ekspor terbaca rapi dengan kolom yang terpisah sempurna ketika dibuka di aplikasi pengolah angka.",
+    "learning": "Memahami pengujian alur otentikasi admin, pembaruan status tiket, serta verifikasi format berkas ekspor data operasional.",
+    "obstacles": "Pengguna yang belum login sempat masih bisa mengakses rute halaman admin sebelum diarahkan ke halaman login. Ditambahkan guard proteksi rute di frontend untuk langsung mengalihkan sesi tidak sah."
+  },
+  {
+    "id": 94,
+    "category": "botskytrax_survey_cli",
+    "activity": "Menguji konfigurasi opsi survei pada berkas `survey_options.json` dan memverifikasi hasil eksekusi skrip `submit_survey.py` di proyek botskytrax. Memastikan struktur log keluaran CLI informatif dalam menampilkan status pengiriman setiap skenario uji.",
+    "learning": "Memahami pengujian skrip otomasi CLI berbasis berkas konfigurasi JSON dan pemantauan log hasil eksekusi di terminal.",
+    "obstacles": "Kesalahan penulisan satu kunci di berkas JSON konfigurasi sempat menghentikan eksekusi skrip tanpa pesan yang jelas. Ditambahkan pengecekan kunci wajib di awal eksekusi agar sumber kesalahan langsung terlihat."
+  },
+  {
+    "id": 95,
+    "category": "botskytrax_validation_vote",
+    "activity": "Menjalankan skrip unit test `test_ip_header_validation.py` dan memeriksa alur penyimpanan bukti screenshot pada modul `vote/submit_vote.py` di proyek botskytrax. Memastikan seluruh kasus uji validasi header IP lulus tanpa kegagalan.",
+    "learning": "Menguasai eksekusi dan verifikasi suite pengujian Python serta pengelolaan folder artefak hasil pengujian CLI.",
+    "obstacles": "Jalur folder screenshot yang belum tersedia pada lingkungan baru sempat memicu FileNotFoundError saat skrip dijalankan. Masalah diatasi dengan menambahkan pembuatan direktori otomatis sebelum penyimpanan berkas."
+  },
+  {
+    "id": 96,
+    "category": "pelaporan_dashdua_ui",
+    "activity": "Meninjau tata letak komponen dashboard (`dashdua_page.jsx`) dan penyajian tabel pada proyek `pelaporan` serta `dashdua` untuk memastikan konsistensi visual antar-kartu metrik. Memeriksa responsivitas grafik dan daftar tabel pada berbagai ukuran layar browser.",
+    "learning": "Memahami evaluasi tata letak dashboard analitik dan penyesuaian komponen visual agar tetap rapi di berbagai resolusi layar.",
+    "obstacles": "Label angka pada salah satu kartu ringkasan sempat terpotong ketika jendela browser dipersempit. Ukuran font responsif dan pembungkusan fleksibel diterapkan agar seluruh angka tetap terbaca utuh."
+  },
+  {
+    "id": 97,
+    "category": "monev_automation_sync",
+    "activity": "Menjalankan pengujian unit (`tests/test_monev.py`) dan memverifikasi alur eksekusi bot Telegram pada proyek `monev` untuk mendukung sinkronisasi dua akun satu tim secara ringkas. Memastikan pesan status di Telegram tetap ringkas dalam satu antarmuka dan kondisi akhir pekan tetap dilewati otomatis.",
+    "learning": "Memahami pengujian unit dengan mock di Python serta verifikasi alur webhook Telegram dan penjadwalan cron serverless.",
+    "obstacles": "Pengujian unit yang membaca konfigurasi `.env` lokal sempat menimpa simulasi skenario akun kosong. Masalah diselesaikan dengan mengisolasi variabel modul dan environment di dalam blok pengujian."
+  }
+]

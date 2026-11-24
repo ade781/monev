@@ -86,6 +86,7 @@ _CACHED_TOKEN_TIME = 0
 _CACHED_TOKENS = {}
 _REMINDER_TEMPLATES = None
 _ACTIVITY_TEMPLATES = None
+_ACTIVITY_TEMPLATES_2 = None
 _TRIGGER_HISTORY = {}
 
 # Masa berlaku token SSO Kemnaker (Kemnaker asli = 21600 detik / 6 jam; kita beri batas aman 20000 detik / ~5.5 jam)
@@ -505,6 +506,31 @@ def format_status_presensi():
     )
 
 # 5. Template & Eksekusi Monev
+def muat_semua_template_2():
+    global _ACTIVITY_TEMPLATES_2
+    if _ACTIVITY_TEMPLATES_2 is None:
+        p = os.path.join(os.path.dirname(__file__), "templates_2.json")
+        try:
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    _ACTIVITY_TEMPLATES_2 = json.load(f)
+        except Exception as e:
+            print(f"[Template Error] Gagal membaca templates_2.json: {e}", flush=True)
+        if _ACTIVITY_TEMPLATES_2 is None:
+            _ACTIVITY_TEMPLATES_2 = []
+    return _ACTIVITY_TEMPLATES_2
+
+def ambil_template_pasangan(template):
+    """Mengambil template pasangan untuk Akun 2 berdasarkan ID dari templates_2.json."""
+    if not template:
+        return None
+    t_id = template.get("id")
+    if t_id is not None:
+        for item in muat_semua_template_2():
+            if item.get("id") == t_id:
+                return item
+    return template
+
 def muat_semua_template():
     global _ACTIVITY_TEMPLATES
     if _ACTIVITY_TEMPLATES is None:
@@ -746,10 +772,11 @@ def sync_secondary_account(today_str=None, template=None, custom_activity=None, 
         if sudah2 and not force:
             return f"\n\n👥 *Akun 2 ({name2_clean}):* ✅ Sudah terisi sebelumnya"
 
+        target_template = ambil_template_pasangan(template) if (template and not custom_activity) else template
         submit_monev(
             token=token2,
             today_str=today_str,
-            template=template,
+            template=target_template,
             custom_activity=custom_activity,
             mark_used=False
         )
